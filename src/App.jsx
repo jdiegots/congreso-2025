@@ -173,7 +173,13 @@ function HemicycleBackground({ colorsVisible, scrollProgress, onSeatClick, group
     const GROUP_GAP = isMobile ? 48 : 80;
     const START_Y = isMobile ? 80 : 120;
 
-    const { EFFECTIVE_WIDTH, OFFSET_X, gparDesiredCols, gridCols } = layoutConfig;
+    // Responsive Config
+    const MARGIN_X = isMobile ? 40 : 80;
+    const EFFECTIVE_WIDTH = Math.min(
+      seatsData.width - 2 * MARGIN_X,
+      viewportWidth ? viewportWidth * (isMobile ? 0.92 : 0.9) : seatsData.width - 2 * MARGIN_X
+    );
+    const OFFSET_X = (seatsData.width - EFFECTIVE_WIDTH) / 2;
 
     // A. Place Fixed Members (Always Top Left of Gov Col)
     const effectiveCols = gparDesiredCols || gridCols || (isMobile ? 3 : 5);
@@ -237,13 +243,13 @@ function HemicycleBackground({ colorsVisible, scrollProgress, onSeatClick, group
 
     // C. Layout Dynamic Groups
     if (groupingCriteria === 'g_par') {
-      const desiredCols = gparDesiredCols || 3;
+      const desiredCols = isMobile ? 2 : Math.min(5, Math.max(3, Math.floor(EFFECTIVE_WIDTH / 260)));
       const colWidth = EFFECTIVE_WIDTH / desiredCols;
       const columnHeights = new Array(desiredCols).fill(START_Y);
       // Column 0 reserves vertical space for fixed Gobierno members
       columnHeights[0] = START_Y + fixedHeight;
 
-      const seatsPerRow = isMobile ? Math.min(6, Math.max(4, Math.floor(EFFECTIVE_WIDTH / 140))) : Math.min(6, Math.max(4, Math.floor(EFFECTIVE_WIDTH / 220)));
+      const seatsPerRow = isMobile ? 3 : Math.min(6, Math.max(4, Math.floor(EFFECTIVE_WIDTH / 220)));
 
       const orderedGroups = ["Gobierno", "Popular en el Congreso", "Socialista", "Vox", "Plurinacional SUMAR", "Republicano", "Junts per Catalunya", "Euskal Herria Bildu", "Vasco (EAJ-PNV)", "Mixto"]
         .filter(name => groupKeysSet.has(name));
@@ -277,11 +283,11 @@ function HemicycleBackground({ colorsVisible, scrollProgress, onSeatClick, group
       // Shift entire grid DOWN to avoid fixed members in Top-Left (which overlaps with Grid Col 0)
       const GRID_START_Y = START_Y + fixedHeight + 40;
 
-      const GRID_COLS = gridCols || (isMobile ? 3 : Math.min(6, Math.max(3, Math.floor(EFFECTIVE_WIDTH / 240))));
+      const GRID_COLS = isMobile ? 2 : Math.min(6, Math.max(3, Math.floor(EFFECTIVE_WIDTH / 240)));
       const colWidth = EFFECTIVE_WIDTH / GRID_COLS;
       const columnY = new Array(GRID_COLS).fill(GRID_START_Y);
 
-      const seatsPerRow = isMobile ? Math.min(6, Math.max(4, Math.floor(EFFECTIVE_WIDTH / 140))) : Math.min(6, Math.max(4, Math.floor(EFFECTIVE_WIDTH / 220)));
+      const seatsPerRow = isMobile ? 3 : Math.min(6, Math.max(4, Math.floor(EFFECTIVE_WIDTH / 220)));
 
       sortedGroupKeys.forEach((gName) => {
         const ids = groups[gName];
@@ -380,7 +386,7 @@ function HemicycleBackground({ colorsVisible, scrollProgress, onSeatClick, group
         color: baseColor,
       };
     });
-  }, [colorsVisible, seatColorMap, scrollProgress, groupingCriteria, seatDeputyMap, isMobile, layoutConfig]);
+  }, [colorsVisible, seatColorMap, scrollProgress, groupingCriteria, seatDeputyMap, isMobile, viewportWidth]);
 
   // Track previous grouping to trigger animation
   const prevGroupingRef = useRef(groupingCriteria);
@@ -450,10 +456,9 @@ function HemicycleBackground({ colorsVisible, scrollProgress, onSeatClick, group
   }, [seats, flashActive, scrollProgress, onSeatClick, groupingCriteria]);
 
   const baseViewBoxHeight = useMemo(() => {
-    const minHeight = isMobile ? 1600 : 1800;
+    const minHeight = isMobile ? 2400 : 1800;
     if (!viewportHeight) return minHeight;
-    const scale = isMobile ? 1.05 : 1.2;
-    return Math.max(minHeight, viewportHeight * scale);
+    return Math.max(minHeight, viewportHeight * 1.2);
   }, [isMobile, viewportHeight]);
 
   // Dynamically expand the viewBox to avoid clipping when groups grow vertically
