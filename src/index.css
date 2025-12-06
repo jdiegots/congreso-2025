@@ -65,17 +65,17 @@ body {
   inset: 0;
   pointer-events: none;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
 }
 
 .hero-bg-svg {
   position: fixed;
-  top: 85px;
+  top: 60px;
   left: 50%;
   transform: translateX(-50%);
-  width: min(820px, 100%);
-  height: auto;
+  width: min(1200px, 95vw);
+  height: min(calc(100vh - 140px), 1100px);
   z-index: 20;
   /* Layering: Behind Hero Text (30), In front of Story Text (10) */
   /* baja el hemiciclo para que quede detrás del título */

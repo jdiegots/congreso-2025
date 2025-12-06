@@ -20,7 +20,7 @@ function getVirtualSeatId(deputyId) {
   return 10000 + deputyId;
 }
 
-function HemicycleBackground({ colorsVisible, scrollProgress, onSeatClick, groupingCriteria, isMobile }) {
+function HemicycleBackground({ colorsVisible, scrollProgress, onSeatClick, groupingCriteria, isMobile, viewportWidth, viewportHeight }) {
   const svgRef = useRef(null);
   const [flashActive, setFlashActive] = useState(false);
   const prevProgressRef = useRef(scrollProgress);
@@ -145,20 +145,35 @@ function HemicycleBackground({ colorsVisible, scrollProgress, onSeatClick, group
 
     // 3. Layout Calculation
     const targetMap = new Map();
-    const SPACING_Y = 36;
-    const SUB_SPACING_X = 36;
-    const GROUP_GAP = 80;
-    const START_Y = 120;
+    const SPACING_Y = isMobile ? 28 : 36;
+    const SUB_SPACING_X = isMobile ? 26 : 36;
+    const GROUP_GAP = isMobile ? 48 : 80;
+    const START_Y = isMobile ? 80 : 120;
 
     // Responsive Config
-    const MARGIN_X = isMobile ? 40 : 100;
-    const EFFECTIVE_WIDTH = isMobile ? 1000 : (seatsData.width - 2 * MARGIN_X);
-    const OFFSET_X = isMobile ? (seatsData.width - EFFECTIVE_WIDTH) / 2 : MARGIN_X;
+    const MARGIN_X = isMobile ? 24 : 80;
+    const EFFECTIVE_WIDTH = Math.min(
+      seatsData.width - 2 * MARGIN_X,
+      viewportWidth ? viewportWidth * (isMobile ? 0.96 : 0.9) : seatsData.width - 2 * MARGIN_X
+    );
+    const OFFSET_X = (seatsData.width - EFFECTIVE_WIDTH) / 2;
+
+    const gparDesiredCols = groupingCriteria === 'g_par'
+      ? (isMobile
+        ? Math.max(3, Math.min(4, Math.floor(EFFECTIVE_WIDTH / 180)))
+        : Math.min(5, Math.max(3, Math.floor(EFFECTIVE_WIDTH / 260))))
+      : null;
+
+    const gridCols = groupingCriteria !== 'g_par'
+      ? (isMobile
+        ? Math.max(3, Math.min(5, Math.floor(EFFECTIVE_WIDTH / 180)))
+        : Math.min(6, Math.max(3, Math.floor(EFFECTIVE_WIDTH / 240))))
+      : null;
 
     // A. Place Fixed Members (Always Top Left of Gov Col)
-    // On mobile, Gov Col width is half of effective width (2 cols), on Desktop it's 1/5
-    const govColWidth = isMobile ? (EFFECTIVE_WIDTH / 2) : (EFFECTIVE_WIDTH / 5);
-    const fixedCx = OFFSET_X + (0 * govColWidth) + govColWidth / 2;
+    const effectiveCols = gparDesiredCols || gridCols || (isMobile ? 3 : 5);
+    const govColWidth = EFFECTIVE_WIDTH / effectiveCols;
+    const fixedCx = OFFSET_X + govColWidth / 2;
 
     fixedGovMembers.sort((a, b) => a.id - b.id);
     fixedGovMembers.forEach((s, idx) => {
@@ -174,7 +189,7 @@ function HemicycleBackground({ colorsVisible, scrollProgress, onSeatClick, group
 
     // Calculate vertical space used by fixed members
     const fixedRows = Math.ceil(fixedGovMembers.length / (isMobile ? 3 : 4));
-    const fixedHeight = fixedRows * SPACING_Y + (fixedGovMembers.length > 0 ? (isMobile ? 60 : 40) : 0);
+    const fixedHeight = fixedRows * SPACING_Y + (fixedGovMembers.length > 0 ? (isMobile ? 48 : 40) : 0);
 
     // B. Bucketing for Dynamic Seats (schemaSeats)
     const groups = {};
@@ -216,59 +231,54 @@ function HemicycleBackground({ colorsVisible, scrollProgress, onSeatClick, group
     }
 
     // C. Layout Dynamic Groups
-    // C. Layout Dynamic Groups
     if (groupingCriteria === 'g_par') {
-      // Strategy: Desktop 5 cols, Mobile 2 cols
-      let COL_LAYOUT;
-      if (isMobile) {
-        COL_LAYOUT = [
-          ["Gobierno", "Socialista", "Republicano"],
-          ["Popular en el Congreso", "Vox", "Plurinacional SUMAR", "Junts per Catalunya", "Euskal Herria Bildu", "Vasco (EAJ-PNV)", "Mixto"]
-        ];
-      } else {
-        COL_LAYOUT = [
-          ["Gobierno"],
-          ["Popular en el Congreso"],
-          ["Socialista"],
-          ["Vox", "Plurinacional SUMAR"],
-          ["Republicano", "Junts per Catalunya", "Euskal Herria Bildu", "Vasco (EAJ-PNV)", "Mixto"]
-        ];
-      }
+      const desiredCols = gparDesiredCols || 3;
+      const colWidth = EFFECTIVE_WIDTH / desiredCols;
+      const columnHeights = new Array(desiredCols).fill(START_Y);
+      // Column 0 reserves vertical space for fixed Gobierno members
+      columnHeights[0] = START_Y + fixedHeight;
 
-      const colLayoutWidth = EFFECTIVE_WIDTH / COL_LAYOUT.length;
+      const seatsPerRow = isMobile ? Math.min(6, Math.max(4, Math.floor(EFFECTIVE_WIDTH / 140))) : Math.min(6, Math.max(4, Math.floor(EFFECTIVE_WIDTH / 220)));
 
-      COL_LAYOUT.forEach((colGroups, colIndex) => {
-        let currentY = START_Y;
-        const cx = OFFSET_X + (colIndex * colLayoutWidth) + colLayoutWidth / 2;
-        colGroups.forEach(gName => {
-          // Offset "Gobierno" group by fixed members height if this is the "Gobierno" group column
-          if (gName === 'Gobierno') {
-            currentY += fixedHeight;
-          }
+      const orderedGroups = ["Gobierno", "Popular en el Congreso", "Socialista", "Vox", "Plurinacional SUMAR", "Republicano", "Junts per Catalunya", "Euskal Herria Bildu", "Vasco (EAJ-PNV)", "Mixto"]
+        .filter(name => groupKeysSet.has(name));
 
-          const ids = groups[gName] || [];
-          if (ids.length === 0) return;
+      orderedGroups.forEach(gName => {
+        const ids = groups[gName] || [];
+        if (ids.length === 0) return;
 
-          const COLS = isMobile ? 3 : 4;
-          ids.forEach((seatId, idx) => {
-            const col = idx % COLS;
-            const row = Math.floor(idx / COLS);
-            const xOffset = (col - (COLS - 1) / 2) * SUB_SPACING_X;
-            targetMap.set(seatId, { x: cx + xOffset, y: currentY + row * SPACING_Y });
-          });
-          currentY += Math.ceil(ids.length / COLS) * SPACING_Y + GROUP_GAP;
+        // Gobierno always in the first column to align with fixed ministers
+        const colIndex = gName === 'Gobierno'
+          ? 0
+          : columnHeights.slice(1).reduce((minIdx, _, idx) => {
+              const absoluteIdx = idx + 1;
+              return columnHeights[absoluteIdx] < columnHeights[minIdx] ? absoluteIdx : minIdx;
+            }, 1);
+
+        let currentY = columnHeights[colIndex];
+        const cx = OFFSET_X + (colIndex * colWidth) + colWidth / 2;
+
+        ids.forEach((seatId, idx) => {
+          const col = idx % seatsPerRow;
+          const row = Math.floor(idx / seatsPerRow);
+          const xOffset = (col - (seatsPerRow - 1) / 2) * SUB_SPACING_X;
+          targetMap.set(seatId, { x: cx + xOffset, y: currentY + row * SPACING_Y });
         });
+
+        columnHeights[colIndex] = currentY + Math.ceil(ids.length / seatsPerRow) * SPACING_Y + GROUP_GAP;
       });
     } else {
       // Grid Strategy
       // Shift entire grid DOWN to avoid fixed members in Top-Left (which overlaps with Grid Col 0)
       const GRID_START_Y = START_Y + fixedHeight + 40;
 
-      const GRID_COLS = isMobile ? 2 : 4;
+      const GRID_COLS = gridCols || (isMobile ? 3 : Math.min(6, Math.max(3, Math.floor(EFFECTIVE_WIDTH / 240))));
       const colWidth = EFFECTIVE_WIDTH / GRID_COLS;
       const columnY = new Array(GRID_COLS).fill(GRID_START_Y);
 
-      sortedGroupKeys.forEach((gName, i) => {
+      const seatsPerRow = isMobile ? Math.min(6, Math.max(4, Math.floor(EFFECTIVE_WIDTH / 140))) : Math.min(6, Math.max(4, Math.floor(EFFECTIVE_WIDTH / 220)));
+
+      sortedGroupKeys.forEach((gName) => {
         const ids = groups[gName];
 
         // Sub-sorting
@@ -288,19 +298,18 @@ function HemicycleBackground({ colorsVisible, scrollProgress, onSeatClick, group
           });
         }
 
-        const colIndex = i % GRID_COLS;
+        const colIndex = columnY.indexOf(Math.min(...columnY));
         let currentY = columnY[colIndex];
         const cx = OFFSET_X + (colIndex * colWidth) + colWidth / 2;
 
-        const COLS_IN_GROUP = 3;
         ids.forEach((seatId, idx) => {
-          const c = idx % COLS_IN_GROUP;
-          const r = Math.floor(idx / COLS_IN_GROUP);
-          const xOffset = (c - (COLS_IN_GROUP - 1) / 2) * SUB_SPACING_X;
+          const c = idx % seatsPerRow;
+          const r = Math.floor(idx / seatsPerRow);
+          const xOffset = (c - (seatsPerRow - 1) / 2) * SUB_SPACING_X;
           targetMap.set(seatId, { x: cx + xOffset, y: currentY + r * SPACING_Y });
         });
 
-        columnY[colIndex] = currentY + Math.ceil(ids.length / COLS_IN_GROUP) * SPACING_Y + GROUP_GAP + 20;
+        columnY[colIndex] = currentY + Math.ceil(ids.length / seatsPerRow) * SPACING_Y + GROUP_GAP + 20;
       });
     }
 
@@ -366,7 +375,7 @@ function HemicycleBackground({ colorsVisible, scrollProgress, onSeatClick, group
         color: baseColor,
       };
     });
-  }, [colorsVisible, seatColorMap, scrollProgress, groupingCriteria, seatDeputyMap]);
+  }, [colorsVisible, seatColorMap, scrollProgress, groupingCriteria, seatDeputyMap, isMobile, viewportWidth]);
 
   // Track previous grouping to trigger animation
   const prevGroupingRef = useRef(groupingCriteria);
@@ -435,7 +444,22 @@ function HemicycleBackground({ colorsVisible, scrollProgress, onSeatClick, group
     svg.selectAll("text").remove();
   }, [seats, flashActive, scrollProgress, onSeatClick, groupingCriteria]);
 
-  const viewBoxHeight = isMobile ? 3200 : 2000;
+  const baseViewBoxHeight = useMemo(() => {
+    const minHeight = isMobile ? 1600 : 1800;
+    if (!viewportHeight) return minHeight;
+    const scale = isMobile ? 1.05 : 1.2;
+    return Math.max(minHeight, viewportHeight * scale);
+  }, [isMobile, viewportHeight]);
+
+  // Dynamically expand the viewBox to avoid clipping when groups grow vertically
+  const viewBoxHeight = useMemo(() => {
+    if (!seats || seats.length === 0) return baseViewBoxHeight;
+    const maxY = seats.reduce((max, seat) => {
+      const y = (seat?.y || 0) + (seat?.r || 0);
+      return y > max ? y : max;
+    }, 0);
+    return Math.max(baseViewBoxHeight, maxY + 80);
+  }, [seats, baseViewBoxHeight]);
 
   return (
     <svg
@@ -589,6 +613,8 @@ export default function App() {
           onSeatClick={handleSeatClick}
           groupingCriteria={groupingCriteria}
           isMobile={isMobile}
+          viewportWidth={size.width}
+          viewportHeight={size.height}
         />
 
         {/* FILTER CONTROLS */}
