@@ -145,10 +145,10 @@ function HemicycleBackground({ colorsVisible, scrollProgress, onSeatClick, group
 
     // 3. Layout Calculation
     const targetMap = new Map();
-    const SPACING_Y = 36;
-    const SUB_SPACING_X = 36;
-    const GROUP_GAP = 80;
-    const START_Y = 120;
+    const SPACING_Y = isMobile ? 28 : 36;
+    const SUB_SPACING_X = isMobile ? 26 : 36;
+    const GROUP_GAP = isMobile ? 48 : 80;
+    const START_Y = isMobile ? 80 : 120;
 
     // Responsive Config
     const MARGIN_X = isMobile ? 40 : 80;
@@ -159,9 +159,9 @@ function HemicycleBackground({ colorsVisible, scrollProgress, onSeatClick, group
     const OFFSET_X = (seatsData.width - EFFECTIVE_WIDTH) / 2;
 
     // A. Place Fixed Members (Always Top Left of Gov Col)
-    // On mobile, Gov Col width is half of effective width (2 cols), on Desktop it's 1/5
-    const govColWidth = isMobile ? (EFFECTIVE_WIDTH / 2) : (EFFECTIVE_WIDTH / 5);
-    const fixedCx = OFFSET_X + (0 * govColWidth) + govColWidth / 2;
+    const effectiveCols = gparDesiredCols || gridCols || (isMobile ? 3 : 5);
+    const govColWidth = EFFECTIVE_WIDTH / effectiveCols;
+    const fixedCx = OFFSET_X + govColWidth / 2;
 
     fixedGovMembers.sort((a, b) => a.id - b.id);
     fixedGovMembers.forEach((s, idx) => {
@@ -177,7 +177,7 @@ function HemicycleBackground({ colorsVisible, scrollProgress, onSeatClick, group
 
     // Calculate vertical space used by fixed members
     const fixedRows = Math.ceil(fixedGovMembers.length / (isMobile ? 3 : 4));
-    const fixedHeight = fixedRows * SPACING_Y + (fixedGovMembers.length > 0 ? (isMobile ? 60 : 40) : 0);
+    const fixedHeight = fixedRows * SPACING_Y + (fixedGovMembers.length > 0 ? (isMobile ? 48 : 40) : 0);
 
     // B. Bucketing for Dynamic Seats (schemaSeats)
     const groups = {};
