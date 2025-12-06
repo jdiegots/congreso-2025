@@ -1,0 +1,47 @@
+﻿[
+    {
+        "id": 1,
+        "g_par": "Popular en el Congreso",
+        "color": "274d8e"
+    },
+    {
+        "id": 2,
+        "g_par": "Socialista",
+        "color": "e40f1a"
+    },
+    {
+        "id": 3,
+        "g_par": "Vox",
+        "color": "5fc23b"
+    },
+    {
+        "id": 4,
+        "g_par": "Plurinacional SUMAR",
+        "color": "fe83c0"
+    },
+    {
+        "id": 5,
+        "g_par": "Republicano",
+        "color": "e3c1a4"
+    },
+    {
+        "id": 6,
+        "g_par": "Junts per Catalunya",
+        "color": "08c6b4"
+    },
+    {
+        "id": 7,
+        "g_par": "Euskal Herria Bildu",
+        "color": "08bfa4"
+    },
+    {
+        "id": 8,
+        "g_par": "Vasco (EAJ-PNV)",
+        "color": 318749
+    },
+    {
+        "id": 9,
+        "g_par": "Mixto",
+        "color": 313131
+    }
+]

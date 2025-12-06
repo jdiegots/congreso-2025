@@ -1,0 +1,149 @@
+﻿[
+    {
+        "id": 1,
+        "nombre": "Partido Popular",
+        "g_par": "Popular",
+        "siglas": "PP",
+        "color": "274d8e"
+    },
+    {
+        "id": 2,
+        "nombre": "Partido Socialista Obrero Español",
+        "g_par": "Socialista",
+        "siglas": "PSOE",
+        "color": "e40f1a"
+    },
+    {
+        "id": 3,
+        "nombre": "Partido de los Socialistas de Cataluña",
+        "g_par": "Socialista",
+        "siglas": "PSC",
+        "color": "e21020"
+    },
+    {
+        "id": 4,
+        "nombre": "Vox",
+        "g_par": "Vox",
+        "siglas": "Vox",
+        "color": "5fc23b"
+    },
+    {
+        "id": 5,
+        "nombre": "Movimiento Sumar",
+        "g_par": "Plurinacional Sumar",
+        "siglas": "SUMAR",
+        "color": "fe83c0"
+    },
+    {
+        "id": 6,
+        "nombre": "Catalunya en Comú",
+        "g_par": "Plurinacional Sumar",
+        "siglas": "CeC",
+        "color": "a92851"
+    },
+    {
+        "id": 7,
+        "nombre": "Izquierda Unida",
+        "g_par": "Plurinacional Sumar",
+        "siglas": "IU",
+        "color": "dd0f2c"
+    },
+    {
+        "id": 8,
+        "nombre": "Más Madrid",
+        "g_par": "Plurinacional Sumar",
+        "siglas": "MM",
+        "color": "51ce90"
+    },
+    {
+        "id": 9,
+        "nombre": "Iniciativa del Poble Valencià",
+        "g_par": "Plurinacional Sumar",
+        "siglas": "IPV",
+        "color": "b22a43"
+    },
+    {
+        "id": 10,
+        "nombre": "Més per Mallorca",
+        "g_par": "Plurinacional Sumar",
+        "siglas": "MÉS",
+        "color": "cad408"
+    },
+    {
+        "id": 11,
+        "nombre": "Chunta Aragonesista",
+        "g_par": "Plurinacional Sumar",
+        "siglas": "CHA",
+        "color": "af0824"
+    },
+    {
+        "id": 12,
+        "nombre": "Esquerra Republicana de Catalunya",
+        "g_par": "Republicano",
+        "siglas": "ERC",
+        "color": "e3c1a4"
+    },
+    {
+        "id": 13,
+        "nombre": "Junts per Catalunya",
+        "g_par": "Junts per Catalunya",
+        "siglas": "JxCat",
+        "color": "08c6b4"
+    },
+    {
+        "id": 14,
+        "nombre": "Euskal Herria Bildu",
+        "g_par": "Euskal Herria Bildu",
+        "siglas": "EH Bildu",
+        "color": "08bfa4"
+    },
+    {
+        "id": 15,
+        "nombre": "Euzko Alderdi Jeltzalea - Partido Nacionalista Vasco",
+        "g_par": "Vasco (EAJ-PNV)",
+        "siglas": "EAJ-PNV",
+        "color": 318749
+    },
+    {
+        "id": 16,
+        "nombre": "Podemos",
+        "g_par": "Mixto",
+        "siglas": "PODEMOS",
+        "color": "956ef5"
+    },
+    {
+        "id": 17,
+        "nombre": "Bloque Nacionalista Galego",
+        "g_par": "Mixto",
+        "siglas": "BNG",
+        "color": "7ab5de"
+    },
+    {
+        "id": 18,
+        "nombre": "Coalición Canaria",
+        "g_par": "Mixto",
+        "siglas": "CCa",
+        "color": "ffd855"
+    },
+    {
+        "id": 19,
+        "nombre": "Unión del Pueblo Navarro",
+        "g_par": "Mixto",
+        "siglas": "UPN",
+        "color": "105bb5"
+    },
+    {
+        "id": 20,
+        "nombre": "Més-Compromís",
+        "g_par": "Mixto",
+        "siglas": "Més-Compromís",
+        "color": "f15f3a"
+    },
+    {
+        "id": 21,
+        "nombre": "Independiente",
+        "g_par": "Mixto",
+        "siglas": "IND",
+        "color": 313131
+    }
+]
