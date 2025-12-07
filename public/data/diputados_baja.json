@@ -1,0 +1,92 @@
+﻿[
+    {
+        "nombre": "Fernández Pena, Paula",
+        "circunscripcion": "Pontevedra",
+        "partido": "PSOE",
+        "g_par": "Socialista",
+        "fecha_baja": "\/Date(1738886400000)\/",
+        "causa_baja": "Causó baja porque renunció voluntariamente a su escaño para centrarse en la gestión municipal como alcaldesa de Silleda.",
+        "imagen": "paula_fernandez"
+    },
+    {
+        "nombre": "Pin Ferrando, Gala",
+        "circunscripcion": "Barcelona",
+        "partido": "SUMAR",
+        "g_par": "Plurinacional SUMAR",
+        "fecha_baja": "\/Date(1739145600000)\/",
+        "causa_baja": "Decidió dejar su escaño por motivos estrictamente personales, explicando que no podía dedicar al cargo la implicación y dedicación que consideraba necesarias, especialmente teniendo en cuenta sus responsabilidades personales y su percepción de no estar \"haciendo todo lo que debería\".",
+        "imagen": "gala_pin"
+    },
+    {
+        "nombre": "Ruiz de Pinedo Undiano, Iñaki",
+        "circunscripcion": "Araba",
+        "partido": "EH Bildu",
+        "g_par": "EH Bildu",
+        "fecha_baja": "\/Date(1739491200000)\/",
+        "causa_baja": "Renunció voluntariamente a su escaño para abandonar la política institucional activa, cerrando su trayectoria como representante de EH Bildu desde 2019.",
+        "imagen": "iñaki_ruiz"
+    },
+    {
+        "nombre": "Esteban Bravo, Aitor",
+        "circunscripcion": "Bizkaia",
+        "partido": "EAJ-PNV",
+        "g_par": "Vasco (EAJ-PNV)",
+        "fecha_baja": "\/Date(1743462000000)\/",
+        "causa_baja": "Dejó su escaño tras 21 años en el Congreso para dedicarse a la presidencia del Partido Nacionalista Vasco (EAJ-PNV), cargo al que fue elegido ese mismo año y que asumió tras abandonar la política parlamentaria nacional.",
+        "imagen": "aitor_esteban"
+    },
+    {
+        "nombre": "Guijarro Ceballos, María",
+        "circunscripcion": "Bizkaia",
+        "partido": "PSOE",
+        "g_par": "Socialista",
+        "fecha_baja": "\/Date(1748991600000)\/",
+        "causa_baja": "Causó baja al ser nombrada Secretaria de Estado de Igualdad y para la Erradicación de la Violencia contra las Mujeres en el Ministerio de Igualdad, asumiendo ese cargo en el Gobierno y dejando su escaño.",
+        "imagen": "maria_guijarro"
+    },
+    {
+        "nombre": "Cerdán León, Santos",
+        "circunscripcion": "Navarra",
+        "partido": "PSOE",
+        "g_par": "Socialista",
+        "fecha_baja": "\/Date(1750028400000)\/",
+        "causa_baja": "Renunció voluntariamente a su escaño tras dimitir como secretario de Organización del PSOE después de que un informe de la Unidad Central Operativa (UCO) de la Guardia Civil le vinculase con presuntos cobros de comisiones ilegales en adjudicaciones de obra pública en el marco del llamado Caso Koldo, y así poder dedicarse a su defensa fuera del aforamiento parlamentario.",
+        "imagen": "santos_cerdan"
+    },
+    {
+        "nombre": "Fernández Herranz, Sandra",
+        "circunscripcion": "Illes Balears",
+        "partido": "PP",
+        "g_par": "Popular en el Congreso",
+        "fecha_baja": "\/Date(1752188400000)\/",
+        "causa_baja": "Dejó su escaño tras ser reforzada su posición en la política balear y dentro del Partido Popular, respondiendo su salida a una remodelación interna y al enfoque de su carrera político en otros ámbitos fuera de la Cámara Baja.",
+        "imagen": "sandra_fernandez"
+    },
+    {
+        "nombre": "Núñez González, Noelia",
+        "circunscripcion": "Madrid",
+        "partido": "PP",
+        "g_par": "Popular en el Congreso",
+        "fecha_baja": "\/Date(1753311600000)\/",
+        "causa_baja": "Renunció voluntariamente a su escaño y a todos sus cargos orgánicos e institucionales tras reconocerse que había presentado información académica \"incorrecta\" en su currículum, admitiendo que no posee los títulos universitarios que figuraban en su ficha oficial.",
+        "imagen": "noelia_nuñez"
+    },
+    {
+        "nombre": "Casares Hontañón, Pedro",
+        "circunscripcion": "Cantabria",
+        "partido": "PSOE",
+        "g_par": "Socialista",
+        "fecha_baja": "\/Date(1753743600000)\/",
+        "causa_baja": "Renunció a su escaño tras ser nombrado delegado del Gobierno en Cantabria.",
+        "imagen": "pedro_casares"
+    },
+    {
+        "nombre": "Lucas Ayala, Francisco",
+        "circunscripcion": "Murcia",
+        "partido": "PSOE",
+        "g_par": "Socialista",
+        "fecha_baja": "\/Date(1756767600000)\/",
+        "causa_baja": "Dejó su escaño tras ser nombrado delegado del Gobierno en la Región de Murcia.",
+        "imagen": "francisco_lucas"
+    }
+]

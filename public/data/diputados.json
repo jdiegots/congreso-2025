@@ -17,7 +17,7 @@
     {
         "id": 2,
         "nombre": "Ábalos Meco, José Luis",
-        "circunscripcion": "Valencia/València",
+        "circunscripcion": "València",
         "partido": "IND",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691362800000)/",
@@ -197,7 +197,7 @@
     {
         "id": 14,
         "nombre": "Alfonso Silvestre, Alma",
-        "circunscripcion": "Valencia/València",
+        "circunscripcion": "València",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691622000000)/",
@@ -467,7 +467,7 @@
     {
         "id": 32,
         "nombre": "Armengol Socias, Francina",
-        "circunscripcion": "Balears (Illes)",
+        "circunscripcion": "Illes Balears",
         "partido": "PSOE",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691535600000)/",
@@ -497,7 +497,7 @@
     {
         "id": 34,
         "nombre": "Asarta Cuevas, Alberto",
-        "circunscripcion": "Castellón/Castelló",
+        "circunscripcion": "Castelló",
         "partido": "VOX",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1692140400000)/",
@@ -512,7 +512,7 @@
     {
         "id": 35,
         "nombre": "Azorín Salar, Lázaro",
-        "circunscripcion": "Alicante/Alacant",
+        "circunscripcion": "Alacant",
         "partido": "PSOE",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691967600000)/",
@@ -542,7 +542,7 @@
     {
         "id": 37,
         "nombre": "Barrio Baroja, Carmelo",
-        "circunscripcion": "Araba/Álava",
+        "circunscripcion": "Araba",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1710806400000)/",
         "fecha_alta": "/Date(1710806400000)/",
@@ -677,7 +677,7 @@
     {
         "id": 46,
         "nombre": "Blanquer Alcaraz, Patricia",
-        "circunscripcion": "Alicante/Alacant",
+        "circunscripcion": "Alacant",
         "partido": "PSOE",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691449200000)/",
@@ -797,7 +797,7 @@
     {
         "id": 54,
         "nombre": "Camino Miñana, Víctor",
-        "circunscripcion": "Valencia/València",
+        "circunscripcion": "València",
         "partido": "PSOE",
         "fecha_condicion_plena": "/Date(1702339200000)/",
         "fecha_alta": "/Date(1702339200000)/",
@@ -812,7 +812,7 @@
     {
         "id": 55,
         "nombre": "Campos Asensi, Jorge",
-        "circunscripcion": "Balears (Illes)",
+        "circunscripcion": "Illes Balears",
         "partido": "VOX",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691535600000)/",
@@ -992,7 +992,7 @@
     {
         "id": 67,
         "nombre": "Clavell López, Óscar",
-        "circunscripcion": "Castellón/Castelló",
+        "circunscripcion": "Castelló",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691103600000)/",
@@ -1142,7 +1142,7 @@
     {
         "id": 77,
         "nombre": "Corujo Berriel, María Dolores",
-        "circunscripcion": "Palmas (Las)",
+        "circunscripcion": "Las Palmas",
         "partido": "PSOE",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691535600000)/",
@@ -1322,7 +1322,7 @@
     {
         "id": 89,
         "nombre": "De Rosa Torner, Fernando",
-        "circunscripcion": "Valencia/València",
+        "circunscripcion": "València",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691622000000)/",
@@ -1367,7 +1367,7 @@
     {
         "id": 92,
         "nombre": "Delgado-Taramona Hernández, Jimena",
-        "circunscripcion": "Palmas (Las)",
+        "circunscripcion": "Las Palmas",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691622000000)/",
@@ -1382,7 +1382,7 @@
     {
         "id": 93,
         "nombre": "Díaz Marín, Raúl",
-        "circunscripcion": "Rioja (La)",
+        "circunscripcion": "La Rioja",
         "partido": "PSOE",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1690930800000)/",
@@ -1412,7 +1412,7 @@
     {
         "id": 95,
         "nombre": "Diouf Dioh, Luc Andre",
-        "circunscripcion": "Palmas (Las)",
+        "circunscripcion": "Las Palmas",
         "partido": "PSOE",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691362800000)/",
@@ -1442,7 +1442,7 @@
     {
         "id": 97,
         "nombre": "Fabra Part, Alberto",
-        "circunscripcion": "Castellón/Castelló",
+        "circunscripcion": "Castelló",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691103600000)/",
@@ -1562,7 +1562,7 @@
     {
         "id": 105,
         "nombre": "Flores Juberías, Carlos",
-        "circunscripcion": "Valencia/València",
+        "circunscripcion": "València",
         "partido": "VOX",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691449200000)/",
@@ -1667,7 +1667,7 @@
     {
         "id": 112,
         "nombre": "Gamarra Ruiz-Clavijo, Concepción",
-        "circunscripcion": "Rioja (La)",
+        "circunscripcion": "La Rioja",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1692140400000)/",
@@ -1697,7 +1697,7 @@
     {
         "id": 114,
         "nombre": "García Chavarría, María Montserrat",
-        "circunscripcion": "Coruña (A)",
+        "circunscripcion": "A Coruña",
         "partido": "PSOE",
         "fecha_condicion_plena": "/Date(1713826800000)/",
         "fecha_alta": "/Date(1713826800000)/",
@@ -1727,7 +1727,7 @@
     {
         "id": 116,
         "nombre": "García Gomis, David",
-        "circunscripcion": "Alicante/Alacant",
+        "circunscripcion": "Alacant",
         "partido": "VOX",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691103600000)/",
@@ -1802,7 +1802,7 @@
     {
         "id": 121,
         "nombre": "Garrido Jiménez, Elisa",
-        "circunscripcion": "Rioja (La)",
+        "circunscripcion": "La Rioja",
         "partido": "PSOE",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691103600000)/",
@@ -1862,7 +1862,7 @@
     {
         "id": 125,
         "nombre": "Gil Lázaro, Ignacio",
-        "circunscripcion": "Valencia/València",
+        "circunscripcion": "València",
         "partido": "VOX",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691103600000)/",
@@ -1877,7 +1877,7 @@
     {
         "id": 126,
         "nombre": "Gil Santiago, Carlos",
-        "circunscripcion": "Valencia/València",
+        "circunscripcion": "València",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691622000000)/",
@@ -1922,7 +1922,7 @@
     {
         "id": 129,
         "nombre": "González López, Nahuel",
-        "circunscripcion": "Valencia/València",
+        "circunscripcion": "València",
         "partido": "IU",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691449200000)/",
@@ -1937,7 +1937,7 @@
     {
         "id": 130,
         "nombre": "González Vázquez, Marta",
-        "circunscripcion": "Coruña (A)",
+        "circunscripcion": "A Coruña",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691535600000)/",
@@ -2012,7 +2012,7 @@
     {
         "id": 135,
         "nombre": "Guijarro García, Txema",
-        "circunscripcion": "Alicante/Alacant",
+        "circunscripcion": "Alacant",
         "partido": "SUMAR",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691017200000)/",
@@ -2102,7 +2102,7 @@
     {
         "id": 141,
         "nombre": "Herrera García, Milena",
-        "circunscripcion": "Balears (Illes)",
+        "circunscripcion": "Illes Balears",
         "partido": "PSOE",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691535600000)/",
@@ -2177,7 +2177,7 @@
     {
         "id": 146,
         "nombre": "Hoyo Juliá, Belén",
-        "circunscripcion": "Valencia/València",
+        "circunscripcion": "València",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691017200000)/",
@@ -2207,7 +2207,7 @@
     {
         "id": 148,
         "nombre": "Ibáñez Mezquita, Alberto",
-        "circunscripcion": "Valencia/València",
+        "circunscripcion": "València",
         "partido": "IPV",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691449200000)/",
@@ -2312,7 +2312,7 @@
     {
         "id": 155,
         "nombre": "Lago Peñas, Manuel",
-        "circunscripcion": "Coruña (A)",
+        "circunscripcion": "A Coruña",
         "partido": "SUMAR",
         "fecha_condicion_plena": "/Date(1707177600000)/",
         "fecha_alta": "/Date(1707177600000)/",
@@ -2357,7 +2357,7 @@
     {
         "id": 158,
         "nombre": "Legarda Uriarte, Mikel",
-        "circunscripcion": "Araba/Álava",
+        "circunscripcion": "Araba",
         "partido": "EAJ-PNV",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1692140400000)/",
@@ -2597,7 +2597,7 @@
     {
         "id": 174,
         "nombre": "Marí Bosó, José Vicente",
-        "circunscripcion": "Balears (Illes)",
+        "circunscripcion": "Illes Balears",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691535600000)/",
@@ -2612,7 +2612,7 @@
     {
         "id": 175,
         "nombre": "Mariscal Anaya, Guillermo",
-        "circunscripcion": "Palmas (Las)",
+        "circunscripcion": "Las Palmas",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691622000000)/",
@@ -2792,7 +2792,7 @@
     {
         "id": 187,
         "nombre": "Martínez Ramírez, Carmen",
-        "circunscripcion": "Valencia/València",
+        "circunscripcion": "València",
         "partido": "PSOE",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691622000000)/",
@@ -2897,7 +2897,7 @@
     {
         "id": 194,
         "nombre": "Melgarejo Moreno, Joaquín",
-        "circunscripcion": "Alicante/Alacant",
+        "circunscripcion": "Alacant",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691535600000)/",
@@ -2942,7 +2942,7 @@
     {
         "id": 197,
         "nombre": "Mercadal Baquero, Pepe",
-        "circunscripcion": "Balears (Illes)",
+        "circunscripcion": "Illes Balears",
         "partido": "PSOE",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691535600000)/",
@@ -2957,7 +2957,7 @@
     {
         "id": 198,
         "nombre": "Merino Martínez, Javier",
-        "circunscripcion": "Rioja (La)",
+        "circunscripcion": "La Rioja",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691017200000)/",
@@ -2972,7 +2972,7 @@
     {
         "id": 199,
         "nombre": "Mesquida Mayans, Joan",
-        "circunscripcion": "Balears (Illes)",
+        "circunscripcion": "Illes Balears",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691362800000)/",
@@ -2987,7 +2987,7 @@
     {
         "id": 200,
         "nombre": "Micó Micó, Àgueda",
-        "circunscripcion": "Valencia/València",
+        "circunscripcion": "València",
         "partido": "Més-Compromís",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691449200000)/",
@@ -3077,7 +3077,7 @@
     {
         "id": 206,
         "nombre": "Montesinos de Miguel, Macarena",
-        "circunscripcion": "Alicante/Alacant",
+        "circunscripcion": "Alacant",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691535600000)/",
@@ -3092,7 +3092,7 @@
     {
         "id": 207,
         "nombre": "Moraleja Gómez, Tristana María",
-        "circunscripcion": "Coruña (A)",
+        "circunscripcion": "A Coruña",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691535600000)/",
@@ -3122,7 +3122,7 @@
     {
         "id": 209,
         "nombre": "Moreno Borrás, Cristina",
-        "circunscripcion": "Valencia/València",
+        "circunscripcion": "València",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1720047600000)/",
         "fecha_alta": "/Date(1720047600000)/",
@@ -3377,7 +3377,7 @@
     {
         "id": 226,
         "nombre": "Otero Gabirondo, Mikel",
-        "circunscripcion": "Araba/Álava",
+        "circunscripcion": "Araba",
         "partido": "EH Bildu",
         "fecha_condicion_plena": "/Date(1739836800000)/",
         "fecha_alta": "/Date(1739836800000)/",
@@ -3482,7 +3482,7 @@
     {
         "id": 233,
         "nombre": "Parra Aparicio, Julia",
-        "circunscripcion": "Alicante/Alacant",
+        "circunscripcion": "Alacant",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691535600000)/",
@@ -3490,7 +3490,7 @@
         "g_par": "Popular en el Congreso",
         "fecha_alta_g_par": "/Date(1692313200000)/",
         "fecha_baja_g_par": null,
-        "biografia": "Administración.  Asesora grupo municipal.  Concejala del Ayuntamiento de Sant Joan d'Alacant. Diputada de Cultura y Transparencia de la Diputación de Alicante (2019-2023). Vicepresidenta de la Diputación de Alicante (2019-2023).",
+        "biografia": "Administración.  Asesora grupo municipal.  Concejala del Ayuntamiento de Sant Joan d'Alicante. Diputada de Cultura y Transparencia de la Diputación de Alicante (2019-2023). Vicepresidenta de la Diputación de Alicante (2019-2023).",
         "asiento": 4,
         "gobierno": 0
     },
@@ -3512,7 +3512,7 @@
     {
         "id": 235,
         "nombre": "Pascual Rocamora, Sandra",
-        "circunscripcion": "Alicante/Alacant",
+        "circunscripcion": "Alacant",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691535600000)/",
@@ -3587,7 +3587,7 @@
     {
         "id": 240,
         "nombre": "Pérez López, Álvaro",
-        "circunscripcion": "Coruña (A)",
+        "circunscripcion": "A Coruña",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1690930800000)/",
@@ -3677,7 +3677,7 @@
     {
         "id": 246,
         "nombre": "Poblador Pacheco, María Araceli",
-        "circunscripcion": "Alicante/Alacant",
+        "circunscripcion": "Alacant",
         "partido": "PSOE",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1690930800000)/",
@@ -3827,7 +3827,7 @@
     {
         "id": 256,
         "nombre": "Rallo Lombarte, Artemi",
-        "circunscripcion": "Castellón/Castelló",
+        "circunscripcion": "Castelló",
         "partido": "PSOE",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691017200000)/",
@@ -3962,7 +3962,7 @@
     {
         "id": 265,
         "nombre": "Rego Candamil, Néstor",
-        "circunscripcion": "Coruña (A)",
+        "circunscripcion": "A Coruña",
         "partido": "BNG",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691622000000)/",
@@ -4022,7 +4022,7 @@
     {
         "id": 269,
         "nombre": "Reynal Reillo, Esperanza",
-        "circunscripcion": "Valencia/València",
+        "circunscripcion": "València",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691622000000)/",
@@ -4082,7 +4082,7 @@
     {
         "id": 273,
         "nombre": "Rodríguez Almeida, Andrés Alberto",
-        "circunscripcion": "Palmas (Las)",
+        "circunscripcion": "Las Palmas",
         "partido": "VOX",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691622000000)/",
@@ -4322,7 +4322,7 @@
     {
         "id": 289,
         "nombre": "Ros Martínez, Susana",
-        "circunscripcion": "Castellón/Castelló",
+        "circunscripcion": "Castelló",
         "partido": "PSOE",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691017200000)/",
@@ -4517,7 +4517,7 @@
     {
         "id": 302,
         "nombre": "Sánchez García, José María",
-        "circunscripcion": "Alicante/Alacant",
+        "circunscripcion": "Alacant",
         "partido": "VOX",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1690930800000)/",
@@ -4532,7 +4532,7 @@
     {
         "id": 303,
         "nombre": "Sánchez Ojeda, Carlos Alberto",
-        "circunscripcion": "Palmas (Las)",
+        "circunscripcion": "Las Palmas",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691449200000)/",
@@ -4547,7 +4547,7 @@
     {
         "id": 304,
         "nombre": "Sánchez Pérez, César",
-        "circunscripcion": "Alicante/Alacant",
+        "circunscripcion": "Alacant",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691535600000)/",
@@ -4637,7 +4637,7 @@
     {
         "id": 310,
         "nombre": "Santana Aguilera, Ada",
-        "circunscripcion": "Palmas (Las)",
+        "circunscripcion": "Las Palmas",
         "partido": "PSOE",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691362800000)/",
@@ -4652,7 +4652,7 @@
     {
         "id": 311,
         "nombre": "Santana Perera, Noemí",
-        "circunscripcion": "Palmas (Las)",
+        "circunscripcion": "Las Palmas",
         "partido": "PODEMOS",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1690930800000)/",
@@ -4712,7 +4712,7 @@
     {
         "id": 315,
         "nombre": "Sarrià Morell, Vicent Manuel",
-        "circunscripcion": "Valencia/València",
+        "circunscripcion": "València",
         "partido": "PSOE",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691622000000)/",
@@ -4772,7 +4772,7 @@
     {
         "id": 319,
         "nombre": "Senderos Oraá, Daniel",
-        "circunscripcion": "Araba/Álava",
+        "circunscripcion": "Araba",
         "partido": "PSOE",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1690930800000)/",
@@ -4847,7 +4847,7 @@
     {
         "id": 324,
         "nombre": "Simarro Vicens, Carlos",
-        "circunscripcion": "Balears (Illes)",
+        "circunscripcion": "Illes Balears",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1753138800000)/",
         "fecha_alta": "/Date(1753052400000)/",
@@ -4877,7 +4877,7 @@
     {
         "id": 326,
         "nombre": "Soler Mur, Alejandro",
-        "circunscripcion": "Alicante/Alacant",
+        "circunscripcion": "Alacant",
         "partido": "PSOE",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691967600000)/",
@@ -4892,7 +4892,7 @@
     {
         "id": 327,
         "nombre": "Taboadela Álvarez, Obdulia",
-        "circunscripcion": "Coruña (A)",
+        "circunscripcion": "A Coruña",
         "partido": "PSOE",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691708400000)/",
@@ -4922,7 +4922,7 @@
     {
         "id": 329,
         "nombre": "Tellado Filgueira, Miguel",
-        "circunscripcion": "Coruña (A)",
+        "circunscripcion": "A Coruña",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1690930800000)/",
@@ -4982,7 +4982,7 @@
     {
         "id": 333,
         "nombre": "Trenzano Rubio, Marta",
-        "circunscripcion": "Valencia/València",
+        "circunscripcion": "València",
         "partido": "PSOE",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691622000000)/",
@@ -5207,7 +5207,7 @@
     {
         "id": 348,
         "nombre": "Vidal Matas, Vicenç",
-        "circunscripcion": "Balears (Illes)",
+        "circunscripcion": "Illes Balears",
         "partido": "MÉS",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691535600000)/",
@@ -5657,7 +5657,7 @@
     {
         "id": 378,
         "nombre": "De Andrés Guerra, Javier",
-        "circunscripcion": "Araba/Álava",
+        "circunscripcion": "Araba",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691535600000)/",
@@ -5717,7 +5717,7 @@
     {
         "id": 382,
         "nombre": "Fernández Herranz, Sandra",
-        "circunscripcion": "Balears (Illes)",
+        "circunscripcion": "Illes Balears",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1692140400000)/",
@@ -5822,7 +5822,7 @@
     {
         "id": 389,
         "nombre": "González Pons, Esteban",
-        "circunscripcion": "Valencia/València",
+        "circunscripcion": "València",
         "partido": "PP",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691017200000)/",
@@ -5972,7 +5972,7 @@
     {
         "id": 399,
         "nombre": "Lois González, Marta",
-        "circunscripcion": "Coruña (A)",
+        "circunscripcion": "A Coruña",
         "partido": "SUMAR",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691967600000)/",
@@ -6047,7 +6047,7 @@
     {
         "id": 404,
         "nombre": "Miñones Conde, José",
-        "circunscripcion": "Coruña (A)",
+        "circunscripcion": "A Coruña",
         "partido": "PsdeG-PSOE",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691967600000)/",
@@ -6062,7 +6062,7 @@
     {
         "id": 405,
         "nombre": "Morant Ripoll, Diana",
-        "circunscripcion": "Valencia/València",
+        "circunscripcion": "València",
         "partido": "PSOE",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691967600000)/",
@@ -6227,7 +6227,7 @@
     {
         "id": 416,
         "nombre": "Ruiz de Pinedo Undiano, Iñaki",
-        "circunscripcion": "Araba/Álava",
+        "circunscripcion": "Araba",
         "partido": "EH Bildu",
         "fecha_condicion_plena": "/Date(1692226800000)/",
         "fecha_alta": "/Date(1691967600000)/",

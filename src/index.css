@@ -65,17 +65,17 @@ body {
   inset: 0;
   pointer-events: none;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
 }
 
 .hero-bg-svg {
   position: fixed;
-  top: 85px;
+  top: 60px;
   left: 50%;
   transform: translateX(-50%);
-  width: min(820px, 100%);
-  height: auto;
+  width: min(1200px, 95vw);
+  height: min(calc(100vh - 140px), 1100px);
   z-index: 20;
   /* Layering: Behind Hero Text (30), In front of Story Text (10) */
   /* baja el hemiciclo para que quede detrás del título */
@@ -232,6 +232,29 @@ body {
 
 .delay-4 {
   animation-delay: 2.5s;
+}
+
+/* FLOATING ANIMATION (Omnidirectional softly) */
+@keyframes float-subtle {
+  0% {
+    transform: translate(0, 0);
+  }
+
+  25% {
+    transform: translate(4px, -6px);
+  }
+
+  50% {
+    transform: translate(-3px, 8px);
+  }
+
+  75% {
+    transform: translate(-5px, -4px);
+  }
+
+  100% {
+    transform: translate(0, 0);
+  }
 }
 
 /* NYT STYLE INFO BOX */
