@@ -1660,54 +1660,65 @@ export default function App() {
                     const rawData = iniciativasData.filter(d => d.tipo === "Proposición de ley");
                     const count = rawData.length;
 
-                    let i_tram = 0;
-                    let i_cerr = 0;
-                    let i_aprob = 0;
-                    let i_rech = 0;
-                    let i_other = 0;
+                    // Group by situacion_actual keeping stable ordering for layout
+                    const statusCounts = {};
+                    rawData.forEach(d => {
+                      const key = (d.situacion_actual || "Sin dato").trim();
+                      statusCounts[key] = (statusCounts[key] || 0) + 1;
+                    });
+
+                    const statusPalette = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#3b82f6", "#a855f7", "#ec4899", "#64748b"];
+
+                    const statusOrder = Object.entries(statusCounts)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([key]) => key);
+
+                    const statusColors = new Map(statusOrder.map((key, idx) => [key, statusPalette[idx % statusPalette.length]]));
+                    const statusInstanceIndex = Object.fromEntries(statusOrder.map(key => [key, 0]));
 
                     const particles = rawData.map((d, i) => {
-                      let typeSit = 'tram';
-                      let typeRes = 'tram';
-
-                      if (d.situacion_actual && d.situacion_actual.includes("Cerrado")) {
-                        typeSit = 'cerr';
-                        const res = d.resultado_tramitacion || "";
-                        if (res.includes("Aprobado")) typeRes = 'aprob';
-                        else if (res.includes("Rechazado")) typeRes = 'rech';
-                        else typeRes = 'other';
-                      }
-
-                      const idx_sit = typeSit === 'cerr' ? i_cerr++ : i_tram++;
-
-                      let idx_res;
-                      if (typeSit === 'tram') {
-                        idx_res = idx_sit;
-                      } else {
-                        if (typeRes === 'aprob') idx_res = i_aprob++;
-                        else if (typeRes === 'rech') idx_res = i_rech++;
-                        else idx_res = i_other++;
-                      }
-
-                      return { ...d, globalIndex: i, typeSit, typeRes, idx_sit, idx_res };
+                      const statusKey = (d.situacion_actual || "Sin dato").trim();
+                      const statusIdx = statusInstanceIndex[statusKey] ?? 0;
+                      statusInstanceIndex[statusKey] = statusIdx + 1;
+                      return { ...d, globalIndex: i, statusKey, statusIdx };
                     });
+
+                    // Tie particle reveal to the headline counter so the number and dots grow together
+                    const visibleCount = Math.min(
+                      particles.length,
+                      Math.max(0, Math.floor(focusP * initiativesCounts[0].count))
+                    );
 
                     const size = isMobile ? 12 : 18;
                     const spread = size + (isMobile ? 2 : 4);
 
                     // --- Animation Phases ---
-                    // 0.00 - 0.40: Dome Entry
-                    // 0.40 - 0.70: Split 1 (Situation)
-                    // 0.70 - 1.00: Split 2 (Result)
+                    // 0.00 - 0.50: Dome Entry (all together)
+                    // 0.50 - 1.00: Split by situacion_actual
 
-                    const pEntry = Math.min(1, swarmProgress / 0.4);
-                    const easeEntry = 1 - Math.pow(1 - pEntry, 3);
+                    const pStatusSplit = Math.min(1, Math.max(0, (swarmProgress - 0.5) / 0.5));
+                    const easeStatusSplit = pStatusSplit * (2 - pStatusSplit);
 
-                    const pSplit1 = Math.min(1, Math.max(0, (swarmProgress - 0.4) / 0.3));
-                    const easeSplit1 = pSplit1 * (2 - pSplit1);
+                    const motionProgress = Math.min(1, swarmProgress / 0.5);
+                    const easeMotion = 1 - Math.pow(1 - motionProgress, 3);
 
-                    const pSplit2 = Math.min(1, Math.max(0, (swarmProgress - 0.7) / 0.3));
-                    const easeSplit2 = pSplit2 * (2 - pSplit2);
+                    // Layout for status clusters
+                    const statusCols = isMobile ? 2 : 4;
+                    const statusRows = Math.ceil(statusOrder.length / statusCols);
+                    const cellWidth = isMobile ? 200 : 240;
+                    const gapX = isMobile ? 90 : 140;
+                    const gapY = isMobile ? 120 : 160;
+                    const gridWidth = statusCols * cellWidth + (statusCols - 1) * gapX;
+                    const gridHeight = statusRows * gapY;
+
+                    const statusCenters = new Map();
+                    statusOrder.forEach((key, idx) => {
+                      const col = idx % statusCols;
+                      const row = Math.floor(idx / statusCols);
+                      const cx = -gridWidth / 2 + col * (cellWidth + gapX) + cellWidth / 2;
+                      const cy = -gridHeight / 2 + row * gapY;
+                      statusCenters.set(key, { cx, cy });
+                    });
 
                     return (
                       <div style={{
@@ -1717,6 +1728,8 @@ export default function App() {
                         zIndex: 50
                       }}>
                         {particles.map((p, i) => {
+                          if (i >= visibleCount) return null;
+
                           // 1. DOME (Center)
                           const seed = i * 492.34;
                           const startAngle = (seed % (Math.PI * 2)) + i;
@@ -1729,8 +1742,9 @@ export default function App() {
                           const theta = i * 2.39996;
                           const r = spread * Math.sqrt(i);
 
+                          const domeOffsetY = isMobile ? -50 : 160;
                           const domeX = r * Math.cos(theta);
-                          const domeY = r * Math.sin(theta) - 50; // Dome Centered
+                          const domeY = r * Math.sin(theta) + domeOffsetY; // Dome Centered
 
                           // 3D Dome Effect Logic
                           // Calculate "height" (z) of the sphere at this radius
@@ -1744,42 +1758,33 @@ export default function App() {
                           // Edge (Horizon) = Smaller
                           const scaleDome = 0.6 + 0.6 * sphereZ;
 
-                          // 2. SITUATION SPLIT (Clusters)
-                          const gap_clusters = isMobile ? 80 : 250;
-                          const cx1 = p.typeSit === 'tram' ? gap_clusters : -gap_clusters;
-                          const r1 = spread * Math.sqrt(p.idx_sit);
-                          const th1 = p.idx_sit * 2.39996;
-                          const sitX = cx1 + r1 * Math.cos(th1);
-                          const sitY = -50 + r1 * Math.sin(th1);
-
-                          // 3. RESULT SPLIT (Sub-Clusters)
-                          let resX = sitX;
-                          let resY = sitY;
-
-                          if (p.typeSit === 'cerr') {
-                            const cx2 = -gap_clusters;
-                            const gap_rows = isMobile ? 100 : 180;
-                            let cy2 = -50;
-
-                            if (p.typeRes === 'aprob') cy2 = -50 - gap_rows;
-                            else if (p.typeRes === 'other') cy2 = -50 + gap_rows;
-                            else cy2 = -50;
-
-                            const r2 = spread * Math.sqrt(p.idx_res);
-                            const th2 = p.idx_res * 2.39996;
-                            resX = cx2 + r2 * Math.cos(th2);
-                            resY = cy2 + r2 * Math.sin(th2);
-                          }
+                          // 2. STATUS SPLIT (Clusters by situacion_actual)
+                          const centerInfo = statusCenters.get(p.statusKey) || { cx: 0, cy: 0 };
+                          const rStatus = spread * Math.sqrt(p.statusIdx);
+                          const thStatus = p.statusIdx * 2.39996;
+                          const statusX = centerInfo.cx + rStatus * Math.cos(thStatus);
+                          const statusY = centerInfo.cy + rStatus * Math.sin(thStatus) - 50;
 
                           // Interpolate Position
                           // EaseOutCubic
-                          const ease = 1 - Math.pow(1 - swarmProgress, 3);
+                          // Drive entry so that all particles meet in the dome before splitting
+                          const ease = easeMotion;
 
                           // If progress is small, opacity is small
-                          const opacity = Math.min(1, swarmProgress * 3);
+                          const opacity = Math.min(1, motionProgress * 3);
+
+                          // Multi-phase destinations
+                          const destX = domeX + (statusX - domeX) * easeStatusSplit;
+                          const destY = domeY + (statusY - domeY) * easeStatusSplit;
 
                           const curX = startX + (destX - startX) * ease;
                           const curY = startY + (destY - startY) * ease;
+
+                          const curScale = scaleDome * Math.min(1, swarmProgress * 1.2);
+
+                          const statusColor = statusColors.get(p.statusKey) || initiativesCounts[0].color;
+                          const colorProgress = Math.min(1, Math.max(0, (pStatusSplit - 0.25) / 0.5));
+                          const backgroundColor = d3.interpolateRgb("#000000", statusColor)(colorProgress);
 
                           // Scale transition as well? 
                           // Let's mix standard scale (0 -> 1) with 3D scale.
@@ -1793,7 +1798,7 @@ export default function App() {
                               width: `${size}px`,
                               height: `${size}px`,
                               borderRadius: '50%',
-                              backgroundColor: p.color || initiativesCounts[0].color,
+                              backgroundColor,
                               opacity: opacity,
                               zIndex: Math.floor((1 - normDist) * 100),
                               transform: `translate(${curX}px, ${curY}px) scale(${curScale})`,
