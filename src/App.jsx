@@ -1688,9 +1688,6 @@ export default function App() {
                       particles.length,
                       Math.max(0, Math.floor(focusP * initiativesCounts[0].count))
                     );
-                    const revealProgress = particles.length
-                      ? Math.min(1, visibleCount / particles.length)
-                      : 0;
 
                     const size = isMobile ? 12 : 18;
                     const spread = size + (isMobile ? 2 : 4);
@@ -1699,13 +1696,10 @@ export default function App() {
                     // 0.00 - 0.50: Dome Entry (all together)
                     // 0.50 - 1.00: Split by situacion_actual
 
-                    // Split only after all dots (and the counter) have finished appearing
-                    const pStatusSplitBase = Math.min(1, Math.max(0, (swarmProgress - 0.5) / 0.5));
-                    const pStatusSplit = revealProgress >= 1 ? pStatusSplitBase : 0;
+                    const pStatusSplit = Math.min(1, Math.max(0, (swarmProgress - 0.5) / 0.5));
                     const easeStatusSplit = pStatusSplit * (2 - pStatusSplit);
 
-                    // Slow the entry so the dome completes alongside the counter reaching 122
-                    const motionProgress = Math.min(1, swarmProgress / 0.5, revealProgress);
+                    const motionProgress = Math.min(1, swarmProgress / 0.5);
                     const easeMotion = 1 - Math.pow(1 - motionProgress, 3);
 
                     // Layout for status clusters
@@ -1777,17 +1771,7 @@ export default function App() {
                           const ease = easeMotion;
 
                           // If progress is small, opacity is small
-                          // Staggered reveal per particle (reduces "instant" pop-in)
-                          const particleRevealStart = i / count;
-                          const revealWindow = 0.15;
-                          const rawReveal = (revealProgress - particleRevealStart) / revealWindow;
-                          const revealEase = rawReveal <= 0
-                            ? 0
-                            : rawReveal >= 1
-                              ? 1
-                              : 1 - Math.pow(1 - rawReveal, 3);
-
-                          const opacity = Math.min(1, motionProgress * 3) * revealEase;
+                          const opacity = Math.min(1, motionProgress * 3);
 
                           // Multi-phase destinations
                           const destX = domeX + (statusX - domeX) * easeStatusSplit;
@@ -1796,7 +1780,7 @@ export default function App() {
                           const curX = startX + (destX - startX) * ease;
                           const curY = startY + (destY - startY) * ease;
 
-                          const curScale = scaleDome * Math.min(1, swarmProgress * 1.2) * (0.4 + 0.6 * revealEase);
+                          const curScale = scaleDome * Math.min(1, swarmProgress * 1.2);
 
                           const statusColor = statusColors.get(p.statusKey) || initiativesCounts[0].color;
                           const colorProgress = Math.min(1, Math.max(0, (pStatusSplit - 0.25) / 0.5));
