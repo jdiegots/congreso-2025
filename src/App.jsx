@@ -1032,11 +1032,63 @@ export default function App() {
     ];
   }, []);
 
+  const approvedStats = useMemo(() => {
+    let counts = { leyes: 0, reales: 0, organicas: 0 };
+    iniciativasData.forEach(d => {
+      const title = (d.titulo || "").trim();
+      if (d.tipo === "Leyes") counts.leyes++;
+      else if (d.tipo === "Reales decretos" && title.startsWith("Real Decreto-ley")) counts.reales++;
+      else if (d.tipo === "Leyes organicas" && title.startsWith("Ley Orgánica")) counts.organicas++;
+    });
+
+    // Use same palette/colors or specific ones
+    return [
+      { label: "Leyes", count: counts.leyes, color: "#111" },
+      { label: "Reales decretos", count: counts.reales, color: "#333" },
+      { label: "Leyes orgánicas", count: counts.organicas, color: "#555" }
+    ];
+  }, []);
+
+  const approvedCount = useMemo(() => approvedStats.reduce((acc, curr) => acc + curr.count, 0), [approvedStats]);
+
+  const projectCount = useMemo(() => iniciativasData.filter(d => d.tipo === "Proyecto de ley").length, []);
+  const maxCount = useMemo(() => Math.max(...initiativesCounts.map(d => d.count)), [initiativesCounts]);
+
   // Initiatives Section Progress
   const initStartY = 20000; // Starts right where departures end
   const initEndY = 26000;
   const initProgressRaw = Math.max(0, (scrollY - initStartY) / (initEndY - initStartY));
   const initProgress = Math.min(1, initProgressRaw);
+
+  // subtitleMix Logic (Lifted for Title access)
+  // Constants must match SwarmOverlay logic exactly
+  const _clusterHold = 0.05;
+  const _clusterRange = 0.6;
+  const _authorHold = _clusterHold + _clusterRange + 0.15;
+  const _authorRange = 0.6;
+  const _projectHold = _authorHold + _authorRange + 0.15;
+  const _projectRange = 0.6;
+
+  const _rawProjectProgress = (initProgressRaw - (1 + _projectHold)) / _projectRange;
+  const _projectProgress = Math.min(1, Math.max(0, _rawProjectProgress));
+  const _projectEase = 1 - Math.pow(1 - _projectProgress, 3);
+  const subtitleMix = _projectEase;
+
+  // Final Phase: Chaotic Fall (Global for Title)
+  // Final Phase: Chaotic Fall (Global for Title)
+  const _chaosStart = _projectHold + _projectRange + 0.1;
+  const _chaosRange = 0.4;
+  const _rawChaosProgress = (initProgressRaw - (1 + _chaosStart)) / _chaosRange;
+  const _chaosProgress = Math.min(1, Math.max(0, _rawChaosProgress));
+  const chaosEase = _chaosProgress * _chaosProgress;
+
+  // Approved Laws Phase (After Chaos)
+  const _approvedStart = _chaosStart + _chaosRange + 0.2; // Start after particles have fallen
+  const _approvedRange = 0.4; // Duration of fade in / count up
+  const _rawApprovedProgress = (initProgressRaw - (1 + _approvedStart)) / _approvedRange;
+  const _approvedProgress = Math.min(1, Math.max(0, _rawApprovedProgress));
+  const approvedPhaseEase = 1 - Math.pow(1 - _approvedProgress, 3);
+
 
 
 
@@ -1199,7 +1251,7 @@ export default function App() {
           </div>
         </div>
       </div>
-      <div style={{ height: "4000vh" }} className="scroll-section">
+      <div style={{ height: "50000px" }} className="scroll-section">
         <div
           className="nyt-info-box"
           style={{
@@ -1518,7 +1570,8 @@ export default function App() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 zIndex: 52,
-                opacity: opacity,
+                zIndex: 52,
+                opacity: opacity * (1 - chaosEase),
                 pointerEvents: opacity > 0 ? 'auto' : 'none'
               }}>
                 {/* Title */}
@@ -1532,7 +1585,7 @@ export default function App() {
                     color: '#111',
                     opacity: opacity
                   }}>
-                    Se presentaron un total de
+                    {_approvedProgress > 0.1 ? "Se aprobaron un total de" : "Se presentaron un total de"}
                   </h2>
 
                   {/* Counter appearing during focus */}
@@ -1541,20 +1594,45 @@ export default function App() {
                     fontFamily: 'var(--font-serif)',
                     fontSize: isMobile ? '28px' : '48px',
                     color: '#111',
-                    opacity: Math.min(1, focusP * 2), // Fade in quickly 
+                    opacity: Math.min(1, focusP * 2), // Fade in quickly
                     transform: `translateY(${20 - focusP * 20}px)`, // Slide up
                     transition: 'opacity 0.2s, transform 0.2s',
-                    textAlign: 'center'
+                    textAlign: 'center',
+                    position: 'relative',
+                    minHeight: isMobile ? '48px' : '60px'
                   }}>
-                    <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-                      {Math.floor(focusP * initiativesCounts[0].count)}
-                    </span>{" "}
-                    <span style={{ fontSize: isMobile ? '20px' : '32px', fontWeight: 400 }}>
-                      proposiciones de ley
+                    <span style={{ position: 'relative', display: 'inline-block' }}>
+                      <span style={{
+                        position: 'absolute',
+                        inset: 0,
+                        opacity: 1 - subtitleMix,
+                        transition: 'opacity 0.2s'
+                      }}>
+                        <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                          {Math.floor(focusP * initiativesCounts[0].count)}
+                        </span>{" "}
+                        <span style={{ fontSize: isMobile ? '20px' : '32px', fontWeight: 400 }}>
+                          proposiciones de ley
+                        </span>
+                      </span>
+
+                      <span style={{
+                        position: 'relative',
+                        opacity: subtitleMix,
+                        transition: 'opacity 0.2s'
+                      }}>
+                        <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                          {Math.floor(focusP * projectCount)}
+                        </span>{" "}
+                        <span style={{ fontSize: isMobile ? '20px' : '32px', fontWeight: 400 }}>
+                          proyectos de ley
+                        </span>
+                      </span>
                     </span>
                   </div>
                 </div>
 
+                {/* Bars Container - Swaps data based on phase */}
                 <div style={{
                   display: 'flex',
                   alignItems: 'flex-end',
@@ -1563,34 +1641,48 @@ export default function App() {
                   height: '100%',
                   width: '100%'
                 }}>
-                  {initiativesCounts.map((d, i) => {
-                    // Growth Logic (0.1 -> 0.6)
-                    const growStart = 0.1 + i * 0.1;
-                    const duration = d.count === 1 ? 0.2 : 0.4;
-                    const growEnd = growStart + duration;
-                    const growP = Math.min(1, Math.max(0, (initProgress - growStart) / (growEnd - growStart)));
-                    const easeGrow = 1 - Math.pow(1 - growP, 3);
+                  {(_approvedProgress > 0.05 ? approvedStats : initiativesCounts).map((d, i) => {
+                    // Growth Logic switch
+                    // If approved phase: Use _approvedProgress
+                    // If init phase: Use initProgress
 
-                    // Shrink Logic (0.7 -> 0.9) - "Vuelven a bajar"
-                    const shrinkStart = 0.7;
-                    const shrinkP = Math.min(1, Math.max(0, (initProgress - shrinkStart) / 0.2));
-                    const easeShrink = shrinkP; // Linear shrink is usually fine, or styled.
+                    let progress = 0;
+                    let fade = 1;
 
-                    // Final Height Factor
-                    const heightP = Math.max(0, easeGrow - easeShrink);
+                    if (_approvedProgress > 0.05) {
+                      // APPROVED PHASE 
+                      const growStart = 0.1 + i * 0.1;
+                      const duration = 0.4;
+                      const growEnd = growStart + duration;
+                      const growP = Math.min(1, Math.max(0, (_approvedProgress - growStart) / (growEnd - growStart)));
+                      progress = 1 - Math.pow(1 - growP, 3);
+                      fade = approvedPhaseEase;
+                    } else {
+                      // INIT PHASE
+                      const growStart = 0.1 + i * 0.1;
+                      const duration = d.count === 1 ? 0.2 : 0.4;
+                      const growEnd = growStart + duration;
+                      const growP = Math.min(1, Math.max(0, (initProgress - growStart) / (growEnd - growStart)));
+                      const easeGrow = 1 - Math.pow(1 - growP, 3);
+                      // Shrink Logic (0.7 -> 0.9) - "Vuelven a bajar"
+                      const shrinkStart = 0.7;
+                      const shrinkP = Math.min(1, Math.max(0, (initProgress - shrinkStart) / 0.2));
+                      progress = Math.max(0, easeGrow - shrinkP); // reuse heightP logic
+                      fade = 1 - shrinkP;
+                    }
+
 
                     const barHeight = (d.count / maxCount) * (isMobile ? 250 : 400);
 
                     return (
-                      <div key={i} style={{
+                      <div key={i + (_approvedProgress > 0.05 ? '_app' : '_init')} style={{
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'flex-end',
                         height: '100%',
-                        // Shrinking to 0 makes them disappear.
-                        opacity: 1 - shrinkP, // Fade out while shrinking
-                        transition: 'opacity 0.1s linear'
+                        opacity: fade,
+                        transition: 'opacity 0.2s linear'
                       }}>
 
                         {/* Number */}
@@ -1599,17 +1691,17 @@ export default function App() {
                           fontSize: isMobile ? '24px' : '48px',
                           fontWeight: 700,
                           marginBottom: '12px',
-                          opacity: heightP > 0.05 ? 1 : 0, // Hide when almost zero
+                          opacity: progress > 0.05 ? 1 : 0, // Hide when almost zero
                           // Follow the bar top. Since Bar Container takes full space but scales visually,
                           // we translate the number down by the empty space amount.
-                          transform: `translateY(${barHeight * (1 - heightP)}px)`,
+                          transform: `translateY(${barHeight * (1 - progress)}px)`,
                           // Remove transition for sync movement with scroll
                           // transition: 'transform 0.1s linear', 
                           color: d.color,
                           fontVariantNumeric: 'tabular-nums',
                           willChange: 'transform'
                         }}>
-                          {Math.floor(growP * d.count)}
+                          {Math.floor(progress * d.count)}
                         </div>
 
                         {/* Bar */}
@@ -1618,7 +1710,7 @@ export default function App() {
                           height: `${Math.max(4, barHeight)}px`,
                           position: 'relative',
                           transformOrigin: 'bottom',
-                          transform: `scaleY(${heightP})`,
+                          transform: `scaleY(${progress})`,
                           boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
                           borderRadius: '8px 8px 0 0',
                           overflow: 'hidden'
@@ -1640,7 +1732,7 @@ export default function App() {
                           color: '#666',
                           maxWidth: isMobile ? '80px' : '150px',
                           lineHeight: 1.2,
-                          opacity: heightP > 0.1 ? 1 : 0, // Fade out when small
+                          opacity: progress > 0.1 ? 1 : 0, // Fade out when small
                           transition: 'opacity 0.2s'
                         }}>
                           {d.label}
@@ -1659,9 +1751,13 @@ export default function App() {
 
                     // --- Data Preparation ---
                     const rawData = iniciativasData.filter(d => d.tipo === "Proposición de ley");
+                    const rawProjectData = iniciativasData.filter(d => d.tipo === "Proyecto de ley");
+
                     const count = rawData.length;
+                    const projectCount = rawProjectData.length;
 
                     const particles = rawData.map((d, i) => ({ ...d, globalIndex: i }));
+                    const projectParticles = rawProjectData.map((d, i) => ({ ...d, projectIndex: i }));
 
                     // Tie particle reveal to the headline counter so the number and dots grow together
                     const visibleCount = Math.min(
@@ -1670,6 +1766,14 @@ export default function App() {
                     );
                     const revealProgress = particles.length
                       ? Math.min(1, visibleCount / particles.length)
+                      : 0;
+
+                    const projectVisibleCount = Math.min(
+                      projectParticles.length,
+                      Math.max(0, Math.floor(focusP * projectCount))
+                    );
+                    const projectRevealProgress = projectParticles.length
+                      ? Math.min(1, projectVisibleCount / projectParticles.length)
                       : 0;
 
                     const size = isMobile ? 12 : 18;
@@ -1711,6 +1815,31 @@ export default function App() {
                       }
                     });
 
+                    const projectClusterGroups = [];
+
+                    const projectStatusGroups = d3.groups(projectParticles, d => normalizedStatus(d.situacion_actual));
+                    projectStatusGroups.sort((a, b) => b[1].length - a[1].length);
+
+                    projectStatusGroups.forEach(([status, items]) => {
+                      if (status === "Cerrado") {
+                        const resultGroups = d3.groups(items, d => d.resultado_tramitacion || "Sin resultado");
+                        resultGroups.sort((a, b) => b[1].length - a[1].length);
+                        resultGroups.forEach(([resultLabel, resultItems]) => {
+                          projectClusterGroups.push({
+                            key: `${status}__${resultLabel}`,
+                            label: `${resultLabel}`,
+                            items: resultItems
+                          });
+                        });
+                      } else {
+                        projectClusterGroups.push({
+                          key: status || "Sin estado",
+                          label: status || "Sin estado",
+                          items
+                        });
+                      }
+                    });
+
                     const clusterCols = clusterGroups.length <= 2 ? clusterGroups.length : (isMobile ? 2 : Math.min(4, Math.ceil(Math.sqrt(clusterGroups.length))));
                     const clusterRows = clusterCols === 0 ? 0 : Math.ceil(clusterGroups.length / clusterCols);
                     const clusterGapX = isMobile ? 200 : 320;
@@ -1727,7 +1856,8 @@ export default function App() {
                       "Rechazado": "Rechazadas",
                       "Retirado": "Retiradas",
                       "Enmiendas/Informe": "Plazo abierto para enmiendas o elaborando informes",
-                      "Decaído": "Decaídas"
+                      "Decaído": "Decaídas",
+                      "Aprobado": "Aprobadas"
                     };
                     clusterGroups.forEach((group, idx) => {
                       const col = idx % clusterCols;
@@ -1756,6 +1886,85 @@ export default function App() {
                       });
                     });
 
+                    const projectClusterCols = projectClusterGroups.length <= 2 ? projectClusterGroups.length : (isMobile ? 2 : Math.min(4, Math.ceil(Math.sqrt(projectClusterGroups.length))));
+                    const projectClusterRows = projectClusterCols === 0 ? 0 : Math.ceil(projectClusterGroups.length / projectClusterCols);
+                    const projectClusterTargets = new Map();
+                    const projectClusterLabels = [];
+
+                    projectClusterGroups.forEach((group, idx) => {
+                      const col = idx % projectClusterCols;
+                      const row = Math.floor(idx / projectClusterCols);
+                      const offsetX = (col - (projectClusterCols - 1) / 2) * clusterGapX;
+                      const offsetY = (row - (projectClusterRows - 1) / 2) * clusterGapY + clusterOriginY;
+
+                      const displayLabel = labelOverrides[group.label] || group.label;
+                      const clusterRadius = spread * Math.sqrt(group.items.length);
+                      const labelOffset = clusterRadius + (isMobile ? 32 : 44);
+
+                      projectClusterLabels.push({
+                        key: `proyecto__${group.key}`,
+                        label: displayLabel,
+                        x: offsetX,
+                        y: offsetY - labelOffset,
+                        count: group.items.length
+                      });
+
+                      group.items.forEach((item, localIdx) => {
+                        const thetaLocal = localIdx * 2.39996;
+                        const rLocal = spread * Math.sqrt(localIdx);
+                        const targetX = offsetX + rLocal * Math.cos(thetaLocal);
+                        const targetY = offsetY + rLocal * Math.sin(thetaLocal);
+                        projectClusterTargets.set(item.projectIndex, { x: targetX, y: targetY });
+                      });
+                    });
+
+                    // Build secondary cluster targets by autor (after a pause in scroll)
+                    const normalizeAuthor = (autorRaw) => {
+                      const author = (autorRaw || "Sin autor").trim();
+                      return author.length === 0 ? "Sin autor" : author;
+                    };
+
+                    const authorGroupsRaw = d3.groups(particles, d => normalizeAuthor(d.autor));
+                    authorGroupsRaw.sort((a, b) => b[1].length - a[1].length);
+
+                    const authorGroups = authorGroupsRaw.map(([label, items]) => ({
+                      key: `autor__${label}`,
+                      label,
+                      items
+                    }));
+
+                    const authorCols = authorGroups.length <= 2 ? authorGroups.length : (isMobile ? 2 : Math.min(4, Math.ceil(Math.sqrt(authorGroups.length))));
+                    const authorRows = authorCols === 0 ? 0 : Math.ceil(authorGroups.length / authorCols);
+                    const authorTargets = new Map();
+                    const authorLabels = [];
+
+                    authorGroups.forEach((group, idx) => {
+                      const col = idx % authorCols;
+                      const row = Math.floor(idx / authorCols);
+                      const offsetX = (col - (authorCols - 1) / 2) * clusterGapX;
+                      const offsetY = (row - (authorRows - 1) / 2) * clusterGapY + clusterOriginY;
+
+                      const displayLabel = normalizeAuthor(group.label).replace(/\s*\n\s*/g, " · ");
+                      const clusterRadius = spread * Math.sqrt(group.items.length);
+                      const labelOffset = clusterRadius + (isMobile ? 32 : 44);
+
+                      authorLabels.push({
+                        key: group.key,
+                        label: displayLabel,
+                        x: offsetX,
+                        y: offsetY - labelOffset,
+                        count: group.items.length
+                      });
+
+                      group.items.forEach((item, localIdx) => {
+                        const thetaLocal = localIdx * 2.39996;
+                        const rLocal = spread * Math.sqrt(localIdx);
+                        const targetX = offsetX + rLocal * Math.cos(thetaLocal);
+                        const targetY = offsetY + rLocal * Math.sin(thetaLocal);
+                        authorTargets.set(item.globalIndex, { x: targetX, y: targetY });
+                      });
+                    });
+
                     // --- Animation Phases ---
                     // 0.00 - 0.50: Dome Entry (all together)
                     // 0.50 - 0.70: Hold the dome complete in center
@@ -1772,6 +1981,35 @@ export default function App() {
                       : 0;
                     const clusterProgress = Math.min(1, Math.max(0, rawClusterProgress));
                     const clusterEase = 1 - Math.pow(1 - clusterProgress, 3);
+
+                    // Secondary regrouping: transition clusters to be organized by autor
+                    const authorHold = clusterHold + clusterScrollRange + 0.15; // small pause after first grouping
+                    const authorScrollRange = 0.6;
+                    const rawAuthorProgress = revealProgress >= 1
+                      ? (initProgressRaw - (1 + authorHold)) / authorScrollRange
+                      : 0;
+                    const authorProgress = Math.min(1, Math.max(0, rawAuthorProgress));
+                    const authorEase = 1 - Math.pow(1 - authorProgress, 3);
+
+                    // Tertiary regrouping: switch to proyectos de ley clustered by situacion_actual
+                    const projectHold = authorHold + authorScrollRange + 0.15; // pause after author clusters
+                    const projectScrollRange = 0.6;
+                    const rawProjectProgress = revealProgress >= 1
+                      ? (initProgressRaw - (1 + projectHold)) / projectScrollRange
+                      : 0;
+                    const projectProgress = Math.min(1, Math.max(0, rawProjectProgress));
+                    const projectEase = 1 - Math.pow(1 - projectProgress, 3);
+
+                    // Final Phase: Chaotic Fall
+                    const chaosStart = projectHold + projectScrollRange + 0.1;
+                    const chaosRange = 0.4; // Faster fall
+                    const rawChaosProgress = revealProgress >= 1
+                      ? (initProgressRaw - (1 + chaosStart)) / chaosRange
+                      : 0;
+                    const chaosProgress = Math.min(1, Math.max(0, rawChaosProgress));
+                    const chaosEase = chaosProgress * chaosProgress; // Accelerate down
+
+                    const subtitleMix = projectEase;
 
                     return (
                       <div style={{
@@ -1826,14 +2064,21 @@ export default function App() {
                               ? 1
                               : 1 - Math.pow(1 - rawReveal, 3);
 
-                          const opacity = Math.min(1, motionProgress * 3) * revealEase;
+                          const opacity = Math.min(1, motionProgress * 3) * revealEase * (1 - projectEase);
 
-                          const clusterTarget = clusterTargets.get(p.globalIndex);
-                          const targetX = clusterTarget ? clusterTarget.x : domeX;
-                          const targetY = clusterTarget ? clusterTarget.y : domeY;
+                          const statusTarget = clusterTargets.get(p.globalIndex);
+                          const authorTarget = authorTargets.get(p.globalIndex);
+                          const baseTargetX = statusTarget ? statusTarget.x : domeX;
+                          const baseTargetY = statusTarget ? statusTarget.y : domeY;
+                          const blendedTargetX = authorTarget
+                            ? baseTargetX + (authorTarget.x - baseTargetX) * authorEase
+                            : baseTargetX;
+                          const blendedTargetY = authorTarget
+                            ? baseTargetY + (authorTarget.y - baseTargetY) * authorEase
+                            : baseTargetY;
 
-                          const destX = domeX + (targetX - domeX) * clusterEase;
-                          const destY = domeY + (targetY - domeY) * clusterEase;
+                          const destX = domeX + (blendedTargetX - domeX) * clusterEase;
+                          const destY = domeY + (blendedTargetY - domeY) * clusterEase;
 
                           const curX = startX + (destX - startX) * ease;
                           const curY = startY + (destY - startY) * ease;
@@ -1869,34 +2114,116 @@ export default function App() {
                           );
                         })}
 
-                        {clusterLabels.map((label) => {
-                          const labelOpacity = clusterProgress <= 0
+                        {projectParticles.map((p, i) => {
+                          if (i >= projectVisibleCount) return null;
+
+                          const seed = i * 392.11;
+                          const startAngle = (seed % (Math.PI * 2)) + i;
+                          const startR = 1200 + (seed % 600);
+                          const startX = Math.cos(startAngle) * startR;
+                          const startY = Math.sin(startAngle) * startR;
+
+                          const theta = i * 2.39996;
+                          const r = spread * Math.sqrt(i);
+
+                          const domeX = r * Math.cos(theta);
+                          const domeY = r * Math.sin(theta) + domeOffsetY; // Dome Centered
+
+                          const maxI = projectCount - 1;
+                          const normDist = maxI > 0 ? Math.sqrt(i / maxI) : 0;
+                          const sphereZ = maxI > 0 ? Math.sqrt(1 - normDist * normDist) : 1;
+
+                          const scaleDome = 0.6 + 0.6 * sphereZ;
+                          const ease = projectEase;
+
+                          const particleRevealStart = i / (projectCount || 1);
+                          const revealWindow = 0.15;
+                          const rawReveal = (projectRevealProgress - particleRevealStart) / revealWindow;
+                          const revealEase = rawReveal <= 0
                             ? 0
-                            : Math.min(1, clusterEase * 1.4);
+                            : rawReveal >= 1
+                              ? 1
+                              : 1 - Math.pow(1 - rawReveal, 3);
+
+                          // Apply Chaos
+                          // If falling, opacity goes down FAST
+                          const fallOpacity = Math.max(0, 1 - chaosProgress * 2);
+
+                          const opacity = Math.min(1, motionProgress * 3) * revealEase * projectEase * fallOpacity;
+
+                          const statusTarget = projectClusterTargets.get(p.projectIndex);
+                          const baseTargetX = statusTarget ? statusTarget.x : domeX;
+                          const baseTargetY = statusTarget ? statusTarget.y : domeY;
+
+                          const destX = domeX + (baseTargetX - domeX) * projectEase;
+                          const destY = domeY + (baseTargetY - domeY) * projectEase;
+
+                          const curX = startX + (destX - startX) * ease;
+                          const curY = startY + (destY - startY) * ease;
+
+                          const clusterScaleTarget = 1;
+                          const clusterScaleProgress = projectProgress > 0
+                            ? Math.min(1, 0.35 + projectEase * 0.9)
+                            : 0;
+                          const morphScale = scaleDome + (clusterScaleTarget - scaleDome) * clusterScaleProgress;
+
+                          // Determine chaotic fall values
+                          // Random fall distance (mostly down, slight spread)
+                          const fallDistance = 800 + (seed % 600);
+                          const fallX = (Math.cos(seed) * 200) * chaosEase; // Slight drift X
+                          const fallY = fallDistance * chaosEase; // Big drop Y
+
+                          const curScale = morphScale * Math.min(1, swarmProgress * 1.2) * (0.4 + 0.6 * revealEase);
+
+                          const backgroundColor = "#000000";
 
                           return (
-                            <div
-                              key={label.key}
-                              style={{
-                                position: 'absolute',
-                                left: '50%',
-                                top: '50%',
-                                transform: `translate(${label.x}px, ${label.y}px) translate(-50%, -100%)`,
-                                color: '#000',
-                                fontWeight: 700,
-                                fontSize: isMobile ? '12px' : '14px',
-                                lineHeight: 1.2,
-                                textAlign: 'center',
-                                whiteSpace: 'nowrap',
-                                opacity: labelOpacity,
-                                textShadow: '0 1px 2px rgba(255,255,255,0.9)',
-                                pointerEvents: 'none'
-                              }}
-                            >
-                              {label.label}
-                            </div>
+                            <div key={`proyecto-${i}`} style={{
+                              position: 'absolute',
+                              left: '50%',
+                              top: '50%',
+                              width: `${size}px`,
+                              height: `${size}px`,
+                              borderRadius: '50%',
+                              backgroundColor,
+                              opacity: opacity,
+                              zIndex: Math.floor((1 - normDist) * 100),
+                              transform: `translate(${curX + fallX}px, ${curY + fallY}px) scale(${curScale})`,
+                              boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                              willChange: 'transform, opacity'
+                            }} />
                           );
                         })}
+
+                        {[{ labels: clusterLabels, mix: (1 - authorEase) * (1 - projectEase) }, { labels: authorLabels, mix: authorEase * (1 - projectEase) }, { labels: projectClusterLabels, mix: projectEase * (1 - chaosEase) }]
+                          .map(({ labels, mix }) => labels.map((label) => {
+                            const labelOpacity = clusterProgress <= 0
+                              ? 0
+                              : Math.min(1, clusterEase * 1.4) * mix;
+
+                            if (labelOpacity <= 0.01) return null;
+
+                            return (
+                              <div
+                                key={label.key + mix}
+                                style={{
+                                  position: 'absolute',
+                                  left: '50%',
+                                  top: '50%',
+                                  transform: `translate(${label.x}px, ${label.y}px) translate(-50%, -100%)`,
+                                  color: '#000',
+                                  fontWeight: 700,
+                                  textAlign: 'center',
+                                  whiteSpace: 'nowrap',
+                                  opacity: labelOpacity * (1 - chaosEase),
+                                  textShadow: '0 1px 2px rgba(255,255,255,0.9)',
+                                  pointerEvents: 'none'
+                                }}
+                              >
+                                {label.label}
+                              </div>
+                            );
+                          }))}
                       </div>
                     );
                   })()}
@@ -1905,6 +2232,8 @@ export default function App() {
             );
           })()}
         </div>
+
+        <div style={{ height: '42000px', width: '1px', flexShrink: 0 }} />
       </div>
     </div>
   );
