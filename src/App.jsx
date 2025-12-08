@@ -1035,7 +1035,8 @@ export default function App() {
   // Initiatives Section Progress
   const initStartY = 20000; // Starts right where departures end
   const initEndY = 26000;
-  const initProgress = Math.min(1, Math.max(0, (scrollY - initStartY) / (initEndY - initStartY)));
+  const initProgressRaw = Math.max(0, (scrollY - initStartY) / (initEndY - initStartY));
+  const initProgress = Math.min(1, initProgressRaw);
 
 
 
@@ -1660,54 +1661,117 @@ export default function App() {
                     const rawData = iniciativasData.filter(d => d.tipo === "Proposición de ley");
                     const count = rawData.length;
 
-                    let i_tram = 0;
-                    let i_cerr = 0;
-                    let i_aprob = 0;
-                    let i_rech = 0;
-                    let i_other = 0;
+                    const particles = rawData.map((d, i) => ({ ...d, globalIndex: i }));
 
-                    const particles = rawData.map((d, i) => {
-                      let typeSit = 'tram';
-                      let typeRes = 'tram';
-
-                      if (d.situacion_actual && d.situacion_actual.includes("Cerrado")) {
-                        typeSit = 'cerr';
-                        const res = d.resultado_tramitacion || "";
-                        if (res.includes("Aprobado")) typeRes = 'aprob';
-                        else if (res.includes("Rechazado")) typeRes = 'rech';
-                        else typeRes = 'other';
-                      }
-
-                      const idx_sit = typeSit === 'cerr' ? i_cerr++ : i_tram++;
-
-                      let idx_res;
-                      if (typeSit === 'tram') {
-                        idx_res = idx_sit;
-                      } else {
-                        if (typeRes === 'aprob') idx_res = i_aprob++;
-                        else if (typeRes === 'rech') idx_res = i_rech++;
-                        else idx_res = i_other++;
-                      }
-
-                      return { ...d, globalIndex: i, typeSit, typeRes, idx_sit, idx_res };
-                    });
+                    // Tie particle reveal to the headline counter so the number and dots grow together
+                    const visibleCount = Math.min(
+                      particles.length,
+                      Math.max(0, Math.floor(focusP * initiativesCounts[0].count))
+                    );
+                    const revealProgress = particles.length
+                      ? Math.min(1, visibleCount / particles.length)
+                      : 0;
 
                     const size = isMobile ? 12 : 18;
                     const spread = size + (isMobile ? 2 : 4);
+                    const domeOffsetY = isMobile ? -50 : 160;
+
+                    // Build cluster targets: first by situacion_actual, with Cerrado split by resultado_tramitacion
+                    const clusterGroups = [];
+
+                    const normalizedStatus = (statusRaw) => {
+                      const status = statusRaw || "Sin estado";
+                      const lower = status.toLowerCase();
+                      if (lower.includes("enmiendas") || lower.includes("informe")) {
+                        return "Enmiendas/Informe";
+                      }
+                      return status;
+                    };
+
+                    const statusGroups = d3.groups(particles, d => normalizedStatus(d.situacion_actual));
+                    statusGroups.sort((a, b) => b[1].length - a[1].length);
+
+                    statusGroups.forEach(([status, items]) => {
+                      if (status === "Cerrado") {
+                        const resultGroups = d3.groups(items, d => d.resultado_tramitacion || "Sin resultado");
+                        resultGroups.sort((a, b) => b[1].length - a[1].length);
+                        resultGroups.forEach(([resultLabel, resultItems]) => {
+                          clusterGroups.push({
+                            key: `${status}__${resultLabel}`,
+                            label: `${resultLabel}`,
+                            items: resultItems
+                          });
+                        });
+                      } else {
+                        clusterGroups.push({
+                          key: status || "Sin estado",
+                          label: status || "Sin estado",
+                          items
+                        });
+                      }
+                    });
+
+                    const clusterCols = clusterGroups.length <= 2 ? clusterGroups.length : (isMobile ? 2 : Math.min(4, Math.ceil(Math.sqrt(clusterGroups.length))));
+                    const clusterRows = clusterCols === 0 ? 0 : Math.ceil(clusterGroups.length / clusterCols);
+                    const clusterGapX = isMobile ? 200 : 320;
+                    const clusterGapY = isMobile ? 180 : 200;
+                    const clusterOriginY = domeOffsetY + (isMobile ? 220 : 140);
+
+                    const clusterTargets = new Map();
+                    const clusterLabels = [];
+
+                    const labelOverrides = {
+                      "Pleno Toma en consideración": "Pendiente de debate inicial en el Pleno",
+                      "Gobierno\nContestación": "En espera de respuesta del Gobierno previo al Pleno",
+                      "Mesa del Congreso\nAcuerdo subsiguiente a la toma en consideración": "En tramitación tras el sí del Pleno",
+                      "Rechazado": "Rechazadas",
+                      "Retirado": "Retiradas",
+                      "Enmiendas/Informe": "Plazo abierto para enmiendas o elaborando informes",
+                      "Decaído": "Decaídas"
+                    };
+                    clusterGroups.forEach((group, idx) => {
+                      const col = idx % clusterCols;
+                      const row = Math.floor(idx / clusterCols);
+                      const offsetX = (col - (clusterCols - 1) / 2) * clusterGapX;
+                      const offsetY = (row - (clusterRows - 1) / 2) * clusterGapY + clusterOriginY;
+
+                      const displayLabel = labelOverrides[group.label] || group.label;
+                      const clusterRadius = spread * Math.sqrt(group.items.length);
+                      const labelOffset = clusterRadius + (isMobile ? 32 : 44);
+
+                      clusterLabels.push({
+                        key: group.key,
+                        label: displayLabel,
+                        x: offsetX,
+                        y: offsetY - labelOffset,
+                        count: group.items.length
+                      });
+
+                      group.items.forEach((item, localIdx) => {
+                        const thetaLocal = localIdx * 2.39996;
+                        const rLocal = spread * Math.sqrt(localIdx);
+                        const targetX = offsetX + rLocal * Math.cos(thetaLocal);
+                        const targetY = offsetY + rLocal * Math.sin(thetaLocal);
+                        clusterTargets.set(item.globalIndex, { x: targetX, y: targetY });
+                      });
+                    });
 
                     // --- Animation Phases ---
-                    // 0.00 - 0.40: Dome Entry
-                    // 0.40 - 0.70: Split 1 (Situation)
-                    // 0.70 - 1.00: Split 2 (Result)
+                    // 0.00 - 0.50: Dome Entry (all together)
+                    // 0.50 - 0.70: Hold the dome complete in center
+                    // >1.20: Separate into clusters (only after a post-122 scroll pause)
+                    const motionProgress = Math.min(1, swarmProgress / 0.5, revealProgress);
+                    const domeEase = 1 - Math.pow(1 - motionProgress, 3);
 
-                    const pEntry = Math.min(1, swarmProgress / 0.4);
-                    const easeEntry = 1 - Math.pow(1 - pEntry, 3);
-
-                    const pSplit1 = Math.min(1, Math.max(0, (swarmProgress - 0.4) / 0.3));
-                    const easeSplit1 = pSplit1 * (2 - pSplit1);
-
-                    const pSplit2 = Math.min(1, Math.max(0, (swarmProgress - 0.7) / 0.3));
-                    const easeSplit2 = pSplit2 * (2 - pSplit2);
+                    // Delay cluster motion until after the dome is complete AND the user scrolls past a pause window.
+                    // This keeps particles resting in the finished circle before they start gliding to clusters.
+                    const clusterHold = 0.05; // extra scroll after 122 before motion starts
+                    const clusterScrollRange = 0.6; // scroll span dedicated to the cluster split
+                    const rawClusterProgress = revealProgress >= 1
+                      ? (initProgressRaw - (1 + clusterHold)) / clusterScrollRange
+                      : 0;
+                    const clusterProgress = Math.min(1, Math.max(0, rawClusterProgress));
+                    const clusterEase = 1 - Math.pow(1 - clusterProgress, 3);
 
                     return (
                       <div style={{
@@ -1717,6 +1781,8 @@ export default function App() {
                         zIndex: 50
                       }}>
                         {particles.map((p, i) => {
+                          if (i >= visibleCount) return null;
+
                           // 1. DOME (Center)
                           const seed = i * 492.34;
                           const startAngle = (seed % (Math.PI * 2)) + i;
@@ -1730,7 +1796,7 @@ export default function App() {
                           const r = spread * Math.sqrt(i);
 
                           const domeX = r * Math.cos(theta);
-                          const domeY = r * Math.sin(theta) - 50; // Dome Centered
+                          const domeY = r * Math.sin(theta) + domeOffsetY; // Dome Centered
 
                           // 3D Dome Effect Logic
                           // Calculate "height" (z) of the sphere at this radius
@@ -1744,42 +1810,42 @@ export default function App() {
                           // Edge (Horizon) = Smaller
                           const scaleDome = 0.6 + 0.6 * sphereZ;
 
-                          // 2. SITUATION SPLIT (Clusters)
-                          const gap_clusters = isMobile ? 80 : 250;
-                          const cx1 = p.typeSit === 'tram' ? gap_clusters : -gap_clusters;
-                          const r1 = spread * Math.sqrt(p.idx_sit);
-                          const th1 = p.idx_sit * 2.39996;
-                          const sitX = cx1 + r1 * Math.cos(th1);
-                          const sitY = -50 + r1 * Math.sin(th1);
-
-                          // 3. RESULT SPLIT (Sub-Clusters)
-                          let resX = sitX;
-                          let resY = sitY;
-
-                          if (p.typeSit === 'cerr') {
-                            const cx2 = -gap_clusters;
-                            const gap_rows = isMobile ? 100 : 180;
-                            let cy2 = -50;
-
-                            if (p.typeRes === 'aprob') cy2 = -50 - gap_rows;
-                            else if (p.typeRes === 'other') cy2 = -50 + gap_rows;
-                            else cy2 = -50;
-
-                            const r2 = spread * Math.sqrt(p.idx_res);
-                            const th2 = p.idx_res * 2.39996;
-                            resX = cx2 + r2 * Math.cos(th2);
-                            resY = cy2 + r2 * Math.sin(th2);
-                          }
-
                           // Interpolate Position
                           // EaseOutCubic
-                          const ease = 1 - Math.pow(1 - swarmProgress, 3);
+                          // Drive entry so that all particles meet and hold in the dome
+                          const ease = domeEase;
 
                           // If progress is small, opacity is small
-                          const opacity = Math.min(1, swarmProgress * 3);
+                          // Staggered reveal per particle (reduces "instant" pop-in)
+                          const particleRevealStart = i / count;
+                          const revealWindow = 0.15;
+                          const rawReveal = (revealProgress - particleRevealStart) / revealWindow;
+                          const revealEase = rawReveal <= 0
+                            ? 0
+                            : rawReveal >= 1
+                              ? 1
+                              : 1 - Math.pow(1 - rawReveal, 3);
+
+                          const opacity = Math.min(1, motionProgress * 3) * revealEase;
+
+                          const clusterTarget = clusterTargets.get(p.globalIndex);
+                          const targetX = clusterTarget ? clusterTarget.x : domeX;
+                          const targetY = clusterTarget ? clusterTarget.y : domeY;
+
+                          const destX = domeX + (targetX - domeX) * clusterEase;
+                          const destY = domeY + (targetY - domeY) * clusterEase;
 
                           const curX = startX + (destX - startX) * ease;
                           const curY = startY + (destY - startY) * ease;
+
+                          const clusterScaleTarget = 1;
+                          const clusterScaleProgress = clusterProgress > 0
+                            ? Math.min(1, 0.35 + clusterEase * 0.9)
+                            : 0;
+                          const morphScale = scaleDome + (clusterScaleTarget - scaleDome) * clusterScaleProgress;
+                          const curScale = morphScale * Math.min(1, swarmProgress * 1.2) * (0.4 + 0.6 * revealEase);
+
+                          const backgroundColor = "#000000";
 
                           // Scale transition as well? 
                           // Let's mix standard scale (0 -> 1) with 3D scale.
@@ -1793,13 +1859,42 @@ export default function App() {
                               width: `${size}px`,
                               height: `${size}px`,
                               borderRadius: '50%',
-                              backgroundColor: p.color || initiativesCounts[0].color,
+                              backgroundColor,
                               opacity: opacity,
                               zIndex: Math.floor((1 - normDist) * 100),
                               transform: `translate(${curX}px, ${curY}px) scale(${curScale})`,
                               boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
                               willChange: 'transform, opacity'
                             }} />
+                          );
+                        })}
+
+                        {clusterLabels.map((label) => {
+                          const labelOpacity = clusterProgress <= 0
+                            ? 0
+                            : Math.min(1, clusterEase * 1.4);
+
+                          return (
+                            <div
+                              key={label.key}
+                              style={{
+                                position: 'absolute',
+                                left: '50%',
+                                top: '50%',
+                                transform: `translate(${label.x}px, ${label.y}px) translate(-50%, -100%)`,
+                                color: '#000',
+                                fontWeight: 700,
+                                fontSize: isMobile ? '12px' : '14px',
+                                lineHeight: 1.2,
+                                textAlign: 'center',
+                                whiteSpace: 'nowrap',
+                                opacity: labelOpacity,
+                                textShadow: '0 1px 2px rgba(255,255,255,0.9)',
+                                pointerEvents: 'none'
+                              }}
+                            >
+                              {label.label}
+                            </div>
                           );
                         })}
                       </div>
