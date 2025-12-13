@@ -6,7 +6,7 @@
         "g_par": "Socialista",
         "fecha_baja": "\/Date(1738886400000)\/",
         "causa_baja": "Causó baja porque renunció voluntariamente a su escaño para centrarse en la gestión municipal como alcaldesa de Silleda.",
-        "imagen": "paula_fernandez"
+        "imagen": "paula_fernandez.webp"
     },
     {
         "nombre": "Pin Ferrando, Gala",
@@ -15,7 +15,7 @@
         "g_par": "Plurinacional SUMAR",
         "fecha_baja": "\/Date(1739145600000)\/",
         "causa_baja": "Decidió dejar su escaño por motivos estrictamente personales, explicando que no podía dedicar al cargo la implicación y dedicación que consideraba necesarias, especialmente teniendo en cuenta sus responsabilidades personales y su percepción de no estar \"haciendo todo lo que debería\".",
-        "imagen": "gala_pin"
+        "imagen": "gala_pin.png"
     },
     {
         "nombre": "Ruiz de Pinedo Undiano, Iñaki",
@@ -24,7 +24,7 @@
         "g_par": "EH Bildu",
         "fecha_baja": "\/Date(1739491200000)\/",
         "causa_baja": "Renunció voluntariamente a su escaño para abandonar la política institucional activa, cerrando su trayectoria como representante de EH Bildu desde 2019.",
-        "imagen": "iñaki_ruiz"
+        "imagen": "iñaki_ruiz.png"
     },
     {
         "nombre": "Esteban Bravo, Aitor",
@@ -33,7 +33,7 @@
         "g_par": "Vasco (EAJ-PNV)",
         "fecha_baja": "\/Date(1743462000000)\/",
         "causa_baja": "Dejó su escaño tras 21 años en el Congreso para dedicarse a la presidencia del Partido Nacionalista Vasco (EAJ-PNV), cargo al que fue elegido ese mismo año y que asumió tras abandonar la política parlamentaria nacional.",
-        "imagen": "aitor_esteban"
+        "imagen": "aitor_esteban.png"
     },
     {
         "nombre": "Guijarro Ceballos, María",
@@ -42,7 +42,7 @@
         "g_par": "Socialista",
         "fecha_baja": "\/Date(1748991600000)\/",
         "causa_baja": "Causó baja al ser nombrada Secretaria de Estado de Igualdad y para la Erradicación de la Violencia contra las Mujeres en el Ministerio de Igualdad, asumiendo ese cargo en el Gobierno y dejando su escaño.",
-        "imagen": "maria_guijarro"
+        "imagen": "maria_guijarro.png"
     },
     {
         "nombre": "Cerdán León, Santos",
@@ -51,7 +51,7 @@
         "g_par": "Socialista",
         "fecha_baja": "\/Date(1750028400000)\/",
         "causa_baja": "Renunció voluntariamente a su escaño tras dimitir como secretario de Organización del PSOE después de que un informe de la Unidad Central Operativa (UCO) de la Guardia Civil le vinculase con presuntos cobros de comisiones ilegales en adjudicaciones de obra pública en el marco del llamado Caso Koldo, y así poder dedicarse a su defensa fuera del aforamiento parlamentario.",
-        "imagen": "santos_cerdan"
+        "imagen": "santos_cerdan.png"
     },
     {
         "nombre": "Fernández Herranz, Sandra",
@@ -60,7 +60,7 @@
         "g_par": "Popular en el Congreso",
         "fecha_baja": "\/Date(1752188400000)\/",
         "causa_baja": "Dejó su escaño tras ser reforzada su posición en la política balear y dentro del Partido Popular, respondiendo su salida a una remodelación interna y al enfoque de su carrera política en otros ámbitos fuera de la Cámara Baja.",
-        "imagen": "sandra_fernandez"
+        "imagen": "sandra_fernandez.png"
     },
     {
         "nombre": "Núñez González, Noelia",
@@ -69,7 +69,7 @@
         "g_par": "Popular en el Congreso",
         "fecha_baja": "\/Date(1753311600000)\/",
         "causa_baja": "Renunció voluntariamente a su escaño y a todos sus cargos orgánicos e institucionales tras reconocerse que había presentado información académica \"incorrecta\" en su currículum, admitiendo que no posee los títulos universitarios que figuraban en su ficha oficial.",
-        "imagen": "noelia_nuñez"
+        "imagen": "noelia_nuñez.png"
     },
     {
         "nombre": "Casares Hontañón, Pedro",
@@ -78,7 +78,7 @@
         "g_par": "Socialista",
         "fecha_baja": "\/Date(1753743600000)\/",
         "causa_baja": "Renunció a su escaño tras ser nombrado delegado del Gobierno en Cantabria.",
-        "imagen": "pedro_casares"
+        "imagen": "pedro_casares.png"
     },
     {
         "nombre": "Lucas Ayala, Francisco",
@@ -87,7 +87,7 @@
         "g_par": "Socialista",
         "fecha_baja": "\/Date(1756767600000)\/",
         "causa_baja": "Dejó su escaño tras ser nombrado delegado del Gobierno en la Región de Murcia.",
-        "imagen": "francisco_lucas"
+        "imagen": "francisco_lucas.png"
     },
     {
         "nombre": "Ábalos Meco, José Luis",
@@ -95,6 +95,6 @@
         "partido": "PSOE",
         "g_par": "Socialista",
         "causa_baja": "No ha causado baja como diputado. Formalmente, sigue teniendo el escaño, pero está suspendido de funciones. La Mesa del Congreso le retiró todos sus derechos parlamentarios (voto, sueldo y actividad) tras su procesamiento judicial y su ingreso en prisión preventiva por el Caso Koldo. Solo perdería el acta si renunciara o hubiera sentencia firme.",
-        "imagen": "abalos"
+        "imagen": "abalos.png"
     }
 ]

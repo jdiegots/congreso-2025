@@ -2082,7 +2082,7 @@ export default function App() {
                     animationDelay: `${i * 1.1}s` // Desynced
                   }}>
                     <img
-                      src={`images/${d.imagen}.png`}
+                      src={`images/${d.imagen}`}
                       alt={d.nombre}
                       onMouseEnter={() => setHoveredDeputyIndex(i)}
                       onMouseLeave={() => setHoveredDeputyIndex(null)}
