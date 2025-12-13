@@ -1,0 +1,17 @@
+          const groupGridColMap = {};
+
+          sortedGroupKeys.forEach((gName) => {
+            const ids = groups[gName];
+
+            // Sub-sorting
+            if (groupingCriteria === 'circunscripcion') {
+              const gParOrder = ["Gobierno", "Socialista", "Popular en el Congreso", "Vox", "Plurinacional SUMAR"];
+              ids.sort((a, b) => {
+                const dA = seatDeputyMap.get(a);
+                const dB = seatDeputyMap.get(b);
+                const gA = dA ? (dA.g_par || "") : "";
+                const gB = dB ? (dB.g_par || "") : "";
+                let ixA = gParOrder.indexOf(gA);
+                let ixB = gParOrder.indexOf(gB);
+                if (ixA === -1) ixA = 999;
+                if (ixB === -1) ixB = 999;

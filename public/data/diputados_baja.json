@@ -59,7 +59,7 @@
         "partido": "PP",
         "g_par": "Popular en el Congreso",
         "fecha_baja": "\/Date(1752188400000)\/",
-        "causa_baja": "Dejó su escaño tras ser reforzada su posición en la política balear y dentro del Partido Popular, respondiendo su salida a una remodelación interna y al enfoque de su carrera político en otros ámbitos fuera de la Cámara Baja.",
+        "causa_baja": "Dejó su escaño tras ser reforzada su posición en la política balear y dentro del Partido Popular, respondiendo su salida a una remodelación interna y al enfoque de su carrera política en otros ámbitos fuera de la Cámara Baja.",
         "imagen": "sandra_fernandez"
     },
     {
@@ -88,5 +88,13 @@
         "fecha_baja": "\/Date(1756767600000)\/",
         "causa_baja": "Dejó su escaño tras ser nombrado delegado del Gobierno en la Región de Murcia.",
         "imagen": "francisco_lucas"
+    },
+    {
+        "nombre": "Ábalos Meco, José Luis",
+        "circunscripcion": "València",
+        "partido": "PSOE",
+        "g_par": "Socialista",
+        "causa_baja": "No ha causado baja como diputado. Formalmente, sigue teniendo el escaño, pero está suspendido de funciones. La Mesa del Congreso le retiró todos sus derechos parlamentarios (voto, sueldo y actividad) tras su procesamiento judicial y su ingreso en prisión preventiva por el Caso Koldo. Solo perdería el acta si renunciara o hubiera sentencia firme.",
+        "imagen": "abalos"
     }
 ]

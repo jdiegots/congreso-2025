@@ -6,6 +6,8 @@ import gparData from "../public/data/gpar.json";
 import partidosData from "../public/data/partidos.json";
 import diputadosBajaData from "../public/data/diputados_baja.json";
 import iniciativasData from "../public/data/iniciativas.json";
+import InitiativesTable from "./components/InitiativesTable";
+import DeputiesTable from "./components/DeputiesTable";
 
 // Helper to format "Surname, Name" -> "Name Surname"
 function formatName(rawName) {
@@ -22,6 +24,15 @@ function getVirtualSeatId(deputyId) {
   return 10000 + deputyId;
 }
 
+// Helper for legislative types
+const isLegislative = (type) => {
+  const t = (type || "").toLowerCase();
+  if (t.includes("real decreto") || t.includes("reales decretos")) return "Reales decretos";
+  if (t.includes("orgánica")) return "Leyes orgánicas";
+  if (t.includes("ley")) return "Leyes";
+  return null;
+};
+
 // Helper to parse /Date(...)/ format
 function parseJsonDate(dateStr) {
   if (!dateStr) return null;
@@ -29,7 +40,67 @@ function parseJsonDate(dateStr) {
   return new Date(timestamp);
 }
 
-function HemicycleBackground({ colorsVisible, scrollProgress, exitProgress, onSeatClick, groupingCriteria, isMobile, viewportWidth, viewportHeight }) {
+// Search Logic Helpers
+function normalizeStr(str) {
+  return str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "";
+}
+
+function searchDeputies(query, deputies, interventionsMap, limit = 3) {
+  if (!query || query.trim().length === 0) return [];
+  const qNorm = normalizeStr(query);
+  const qTokens = qNorm.split(/\s+/).filter(t => t.length > 0);
+
+  return deputies
+    .filter(d => d.g_par && d.g_par.trim().length > 0)
+    .map(d => {
+      let score = 0;
+      const nameNorm = normalizeStr(d.nombre);
+      const partsOriginal = nameNorm.split(/[\s,]+/);
+
+      let matchesAllTokens = true;
+
+      qTokens.forEach(token => {
+        let maxTokenScore = 0;
+        let tokenFound = false;
+
+        partsOriginal.forEach((part, index) => {
+          let partScore = 0;
+          if (part === token) partScore = 30;
+          else if (part.startsWith(token)) partScore = 20;
+          else if (part.includes(token)) partScore = 5;
+
+          if (partScore > 0) {
+            if (index === 0) partScore += 10; // Surname priority
+            if (partScore > maxTokenScore) maxTokenScore = partScore;
+            tokenFound = true;
+          }
+        });
+
+        if (!tokenFound) {
+          // check matches in other fields if needed, or penalize
+          matchesAllTokens = false;
+        }
+
+        score += maxTokenScore;
+      });
+
+      if (!matchesAllTokens) return { d, score: 0 };
+
+      // Relevance signals
+      const intsCount = interventionsMap[d.nombre] || 0;
+      score += Math.min(20, intsCount / 10);
+
+      if (d.gobierno == 1) score += 20;
+
+      return { d, score };
+    })
+    .filter(item => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(item => item.d);
+}
+
+function HemicycleBackground({ colorsVisible, scrollProgress, exitProgress, onSeatClick, groupingCriteria, isMobile, viewportWidth, viewportHeight, interventionsMap }) {
   const svgRef = useRef(null);
   const [flashActive, setFlashActive] = useState(false);
   const prevProgressRef = useRef(scrollProgress);
@@ -58,10 +129,12 @@ function HemicycleBackground({ colorsVisible, scrollProgress, exitProgress, onSe
 
   useEffect(() => {
     // Check if we just completed organization (crossed 0.98 threshold)
+    /* Flash removed as requested
     if (scrollProgress >= 0.98 && prevProgressRef.current < 0.98) {
       setFlashActive(true);
       setTimeout(() => setFlashActive(false), 600);
     }
+    */
     prevProgressRef.current = scrollProgress;
   }, [scrollProgress]);
 
@@ -92,7 +165,7 @@ function HemicycleBackground({ colorsVisible, scrollProgress, exitProgress, onSe
     const isExtra = (d) => d.gobierno === 1 && !d.asiento;
 
     allDeputies.forEach(d => {
-      const seatId = d.asiento ? d.asiento : (isExtra(d) ? getVirtualSeatId(d.id) : null);
+      const seatId = d.asiento ? parseInt(d.asiento, 10) : (isExtra(d) ? getVirtualSeatId(d.id) : null);
       if (!seatId) return;
 
       let initC = "#666";
@@ -131,7 +204,7 @@ function HemicycleBackground({ colorsVisible, scrollProgress, exitProgress, onSe
     const isExtra = (d) => d.gobierno === 1 && !d.asiento;
 
     diputadosData.forEach(d => {
-      const seatId = d.asiento ? d.asiento : (isExtra(d) ? getVirtualSeatId(d.id) : null);
+      const seatId = d.asiento ? parseInt(d.asiento, 10) : (isExtra(d) ? getVirtualSeatId(d.id) : null);
       if (seatId) {
         const fullPartyName = partyNames[d.partido] || d.partido || "";
         map.set(seatId, {
@@ -238,8 +311,9 @@ function HemicycleBackground({ colorsVisible, scrollProgress, exitProgress, onSe
         // return info.g_par || 'Mixto';
         // But previously: if (info.gobierno === 1) return 'Gobierno';
 
-        // CHANGE: Do NOT bucket by 'Gobierno'. Just bucket by g_par.
-        return info.g_par || 'Mixto';
+        // CHANGE: If they don't have g_par, DO NOT put them in Mixto. Return null so they remain unmapped and fade out.
+        if (!info.g_par) return null;
+        return info.g_par;
       } else if (groupingCriteria === 'partido') {
         const sigla = info.partido;
         if (sigla === 'IND') return 'Independiente';
@@ -345,7 +419,13 @@ function HemicycleBackground({ colorsVisible, scrollProgress, exitProgress, onSe
             // Same party: Govt members first?
             const govA = infoA.gobierno || 0;
             const govB = infoB.gobierno || 0;
-            return govB - govA;
+
+            if (govA !== govB) return govB - govA;
+
+            // Sort by interventions
+            const intA = interventionsMap[infoA.nombre] || 0;
+            const intB = interventionsMap[infoB.nombre] || 0;
+            return intB - intA;
           });
 
           // Add Group Label - MOBILE
@@ -417,7 +497,13 @@ function HemicycleBackground({ colorsVisible, scrollProgress, exitProgress, onSe
 
             const govA = infoA.gobierno || 0;
             const govB = infoB.gobierno || 0;
-            return govB - govA;
+
+            if (govA !== govB) return govB - govA;
+
+            // Sort by interventions
+            const intA = interventionsMap[infoA.nombre] || 0;
+            const intB = interventionsMap[infoB.nombre] || 0;
+            return intB - intA;
           });
 
           // Distribute groups to the shortest column to balance height
@@ -510,18 +596,54 @@ function HemicycleBackground({ colorsVisible, scrollProgress, exitProgress, onSe
 
         // Sub-sorting
         if (groupingCriteria === 'circunscripcion') {
-          const gParOrder = ["Gobierno", "Socialista", "Popular en el Congreso", "Vox", "Plurinacional SUMAR"];
+          // Calculate party counts WITHIN this constituency
+          const localPartyCounts = {};
+          ids.forEach(id => {
+            const info = seatDeputyMap.get(id);
+            if (info && info.partido) {
+              localPartyCounts[info.partido] = (localPartyCounts[info.partido] || 0) + 1;
+            }
+          });
+
           ids.sort((a, b) => {
             const dA = seatDeputyMap.get(a);
             const dB = seatDeputyMap.get(b);
-            const gA = dA ? (dA.g_par || "") : "";
-            const gB = dB ? (dB.g_par || "") : "";
-            let ixA = gParOrder.indexOf(gA);
-            let ixB = gParOrder.indexOf(gB);
-            if (ixA === -1) ixA = 999;
-            if (ixB === -1) ixB = 999;
-            if (ixA !== ixB) return ixA - ixB;
-            return gA.localeCompare(gB);
+            const pA = dA ? (dA.partido || "") : "";
+            const pB = dB ? (dB.partido || "") : "";
+
+            // 1. Party Size within Constituency (Desc)
+            const sizeA = localPartyCounts[pA] || 0;
+            const sizeB = localPartyCounts[pB] || 0;
+            if (sizeA !== sizeB) return sizeB - sizeA;
+
+            // 1.5. If counts are tied, sort by Party Name to keep them grouped
+            if (pA !== pB) return pA.localeCompare(pB);
+
+            // 2. Government Member (Desc)
+            const govA = dA ? (dA.gobierno || 0) : 0;
+            const govB = dB ? (dB.gobierno || 0) : 0;
+            if (govA !== govB) return govB - govA;
+
+            // 3. Intervention Time (Desc)
+            const intA = interventionsMap[dA.nombre] || 0;
+            const intB = interventionsMap[dB.nombre] || 0;
+            return intB - intA;
+          });
+        } else if (groupingCriteria === 'partido') {
+          // Sort by Government (1) then Interventions (Desc)
+          ids.sort((a, b) => {
+            const dA = seatDeputyMap.get(a);
+            const dB = seatDeputyMap.get(b);
+
+            // 1. Government Member (Desc)
+            const govA = dA ? (dA.gobierno || 0) : 0;
+            const govB = dB ? (dB.gobierno || 0) : 0;
+            if (govA !== govB) return govB - govA;
+
+            // 2. Intervention Time (Desc)
+            const intA = interventionsMap[dA.nombre] || 0;
+            const intB = interventionsMap[dB.nombre] || 0;
+            return intB - intA;
           });
         }
 
@@ -653,7 +775,8 @@ function HemicycleBackground({ colorsVisible, scrollProgress, exitProgress, onSe
       // We can use seatDeputyMap or check if it was bucketed.
 
       const info = seatDeputyMap.get(i);
-      const isMinister = info && info.gobierno === 1;
+      // Fix: gobierno is string "1" in JSON
+      const isMinister = info && (info.gobierno == 1);
       const hasGroup = info && info.g_par; // If g_par is present (not null/empty)
 
       // If scroll is active (layout changing or changed)
@@ -701,7 +824,7 @@ function HemicycleBackground({ colorsVisible, scrollProgress, exitProgress, onSe
     });
 
     return { seats: mappedSeats, groupLabels: groupLabelsData };
-  }, [colorsVisible, seatColorMap, scrollProgress, groupingCriteria, seatDeputyMap, isMobile, viewportWidth, exitProgress]);
+  }, [colorsVisible, seatColorMap, scrollProgress, groupingCriteria, seatDeputyMap, isMobile, viewportWidth, exitProgress, interventionsMap]);
 
   // Track previous grouping to trigger animation
   const prevGroupingRef = useRef(groupingCriteria);
@@ -751,7 +874,7 @@ function HemicycleBackground({ colorsVisible, scrollProgress, exitProgress, onSe
     // UPDATE
     circles.merge(enter)
       .style("cursor", scrollProgress >= 0.95 ? "pointer" : "default")
-      .classed("flash-effect", flashActive)
+      // .classed("flash-effect", flashActive) // Removed
       .on("click", (event, d) => {
         event.stopPropagation();
         if (scrollProgress >= 0.95 && onSeatClick) {
@@ -821,7 +944,8 @@ function HemicycleBackground({ colorsVisible, scrollProgress, exitProgress, onSe
       className="hero-bg-svg"
       style={{
         opacity: colorsVisible ? 1 : 0.22,
-        transition: "opacity 0.5s ease-in-out"
+        filter: colorsVisible ? 'blur(0px)' : 'blur(4px)',
+        transition: "opacity 0.5s ease-in-out, filter 0.5s ease-in-out"
       }}
       viewBox={`0 0 ${seatsData.width} ${viewBoxHeight}`}
       aria-hidden="true"
@@ -851,17 +975,326 @@ function useWindowSize() {
   return windowSize;
 }
 
+
+// ... (existing helper functions remain)
+
 export default function App() {
+  const [view, setView] = useState('story'); // 'story' | 'database'
   const [scrollY, setScrollY] = useState(0);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [hoveredDeputyIndex, setHoveredDeputyIndex] = useState(null); // Track hovered deputy image
   const [selectedDeputy, setSelectedDeputy] = useState(null);
   const [groupingCriteria, setGroupingCriteria] = useState('g_par');
 
+  // Stats state
+  const [votesByDeputy, setVotesByDeputy] = useState({});
+  const [interventionsMap, setInterventionsMap] = useState({}); // Map Name -> Total Minutes
+  const [abstentionLeaders, setAbstentionLeaders] = useState([]);
+
+  // Search State
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+
+  // Moved up to be available for effects
   const size = useWindowSize();
   const isMobile = size.width < 1024;
 
-  // ... rest of component
+
+
+  // Story View Effect Logic 
+  useEffect(() => {
+    const results = searchDeputies(searchTerm, diputadosData, interventionsMap, isMobile ? 2 : 3);
+    setSearchResults(results);
+  }, [searchTerm, interventionsMap, isMobile]);
+
+  useEffect(() => {
+    d3.csv("/data/out_votaciones/votos.csv").then(rows => {
+      const map = {};
+      rows.forEach(r => {
+        const did = r.diputado_id;
+        if (!did) return;
+        const key = String(did);
+
+        if (!map[key]) map[key] = { si: 0, no: 0, abs: 0, nv: 0 };
+
+        const v = (r.voto || "").toLowerCase().trim();
+        if (v === 'sí' || v === 'si') map[key].si++;
+        else if (v === 'no') map[key].no++;
+        else if (v === 'abstención' || v === 'abstencion') map[key].abs++;
+        else map[key].nv++;
+      });
+      setVotesByDeputy(map);
+
+      // Calculate Abstention Leaders
+      const leaders = [];
+      Object.keys(map).forEach(key => {
+        const stats = map[key];
+        if (stats.abs > 0) {
+          const dep = diputadosData.find(d => String(d.id) === key);
+          if (dep) {
+            leaders.push({ ...dep, count: stats.abs });
+          }
+        }
+      });
+      // Sort by count desc
+      leaders.sort((a, b) => b.count - a.count);
+
+      // Filter only the absolute max (ties included)
+      if (leaders.length > 0) {
+        const maxCount = leaders[0].count;
+        const topLeaders = leaders.filter(l => l.count === maxCount);
+        setAbstentionLeaders(topLeaders);
+      } else {
+        setAbstentionLeaders([]);
+      }
+    }).catch(e => console.error("Could not load votes:", e));
+
+
+
+    // NEW: Load interventions
+    d3.csv("/data/intervenciones_con_grupo.csv").then(rows => {
+      const map = {};
+      rows.forEach(r => {
+        const orator = (r.ORADOR || "").trim();
+        if (!orator) return;
+
+        // Parse DURACION "H:MM"
+        const dur = r.DURACION || "0:00";
+        const parts = dur.split(':');
+        let minutes = 0;
+        if (parts.length === 2) {
+          minutes = parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+        } else {
+          // Fallback or ignore
+        }
+
+        if (!map[orator]) map[orator] = 0;
+        map[orator] += minutes;
+      });
+      setInterventionsMap(map);
+    }).catch(e => console.error("Error loading interventions:", e));
+
+  }, []);
+
+  // NEW: Load all legislative votes for the Swarm visualization
+  const [allVotes, setAllVotes] = useState([]);
+  useEffect(() => {
+    d3.csv("/data/out_votaciones/votaciones.csv").then(rows => {
+      setAllVotes(rows);
+    }).catch(e => console.error("Error loading votaciones.csv:", e));
+  }, []);
+
+  // Pre-calculate Swarm Data to prevent lag on mount
+  const swarmData = useMemo(() => {
+    if (!iniciativasData) return { nodes: [], categories: [] };
+
+    // Define Categories and Colors
+    const categoryConfig = {
+      "Aprobadas": { color: "#2F855A", label: "Aprobadas" },
+      "Rechazadas": { color: "#C53030", label: "Rechazadas" },
+      "En trámite": { color: "#3182CE", label: "En trámite" },
+      "Retiradas": { color: "#718096", label: "Retiradas" },
+      "Decaídas": { color: "#D69E2E", label: "Decaídas" }
+    };
+    const catKeys = ["Aprobadas", "En trámite", "Rechazadas", "Retiradas", "Decaídas"];
+
+    const processed = [];
+
+    iniciativasData.forEach(ini => {
+      let status = null;
+      const result = (ini.resultado_tramitacion || "").trim();
+      const situacion = (ini.situacion_actual || "").trim();
+      const tipo = (ini.tipo || "").trim();
+      const titulo = (ini.titulo || "").trim();
+      const tituloLower = titulo.toLowerCase();
+
+      if (result === "Aprobado") {
+        const isValidType = ["Leyes", "Proposición de ley", "Proyecto de ley"].includes(tipo);
+        const startsWithRD = tituloLower.startsWith("real decreto-ley");
+        const startsWithLO = tituloLower.startsWith("ley orgánica") || tituloLower.startsWith("ley organica");
+        if (isValidType || startsWithRD || startsWithLO) {
+          status = "Aprobadas";
+        } else {
+          return;
+        }
+      }
+      else if (result === "Rechazado") status = "Rechazadas";
+      else if (result === "Retirado") status = "Retiradas";
+      else if (result === "Decaido" || result === "Decaído") status = "Decaídas";
+      else if (situacion !== "Cerrado" && situacion !== "" && situacion !== null) status = "En trámite";
+
+      if (!status) return;
+
+      if (status !== "Aprobadas") {
+        const normalizedType = isLegislative(ini.tipo);
+        if (!normalizedType) return;
+      }
+      const normalizedType = isLegislative(ini.tipo) || "Otras";
+
+      const cleanTitle = tituloLower.replace(/\s+/g, ' ').trim();
+
+      // EXCLUSIONS
+      if (cleanTitle.includes("ley 2/2025, de 29 de abril, por la que se modifican el texto refundido de la ley del estatuto de los trabajadores")) return;
+      if (cleanTitle.includes("ley orgánica 1/2025, de 2 de enero, de medidas en materia de eficiencia del servicio público de justicia")) return;
+
+      // USER REQUEST: EXCLUDE Ley 1/2025 desperdicio alimentario
+      if (cleanTitle.includes("ley 1/2025") && cleanTitle.includes("desperdicio alimentario")) return;
+
+      // OVERRIDES & NOTES
+      let resultOverride = null;
+      let customNote = null;
+
+      if (cleanTitle.includes("ley 5/2025, de 24 de julio, por la que se modifican el texto refundido de la ley sobre responsabilidad civil y seguro en la circulación de vehículos a motor")) {
+        resultOverride = "Aprobada en la Comisión de Economía, Comercio y Transformación Digital con competencia legislativa plena";
+      }
+
+      // USER REQUEST: Ley 7/2025 Salud Pública
+      if (cleanTitle.includes("ley 7/2025") && cleanTitle.includes("salud pública")) {
+        resultOverride = "Aprobada en la Comisión de Sanidad con competencia legislativa plena";
+      }
+
+      // USER REQUEST: Ley 6/2025 Canarias
+      if (cleanTitle.includes("ley 6/2025") && cleanTitle.includes("canarias")) {
+        resultOverride = "Aprobada en la Comisión de Hacienda y Función Pública con competencia legislativa plena";
+      }
+
+      // USER REQUEST: RDL 7/2025
+      if (cleanTitle.includes("real decreto-ley 7/2025") && cleanTitle.includes("sistema eléctrico")) {
+        customNote = "Derogado por el Congreso de los Diputados en Pleno el 22 de julio de 2025";
+      }
+
+      let vote = null;
+
+      // MATCHING LOGIC
+      if (cleanTitle.includes("estatuto de roma") && cleanTitle.includes("ratificación")) {
+        vote = allVotes.find(v => (v.texto_expediente || "").toLowerCase().replace(/\s+/g, ' ').trim().includes("votación de conjunto del texto del proyecto de ley orgánica por la que se autoriza la ratificación de cuatro enmiendas al artículo 8.2 del estatuto de roma"));
+      }
+      // USER REQUEST: Ley 9/2025 Movilidad
+      else if (cleanTitle.includes("ley 9/2025") && cleanTitle.includes("movilidad sostenible")) {
+        customNote = "Publicado el 4 de diciembre de 2025 tras las votaciones de enmiendas del Senado en Pleno el 13 de noviembre de 2025";
+        vote = allVotes.find(v => (v.texto_expediente || "").toLowerCase().replace(/\s+/g, ' ').trim().includes("votación del dictamen del proyecto de ley de movilidad"));
+      }
+      // USER REQUEST: Ley Orgánica 3/2025 Derecho de Asociación
+      else if (cleanTitle.includes("ley orgánica 3/2025") && cleanTitle.includes("asociación")) {
+        vote = allVotes.find(v => (v.texto_expediente || "").toLowerCase().replace(/\s+/g, ' ').trim().includes("proposición de ley orgánica por la que se modifica la ley orgánica 1/2002, de 22 de marzo, reguladora del derecho de asociación"));
+      }
+      // USER REQUEST: Ley 4/2025 Navarra
+      else if (cleanTitle.includes("ley 4/2025") && cleanTitle.includes("navarra")) {
+        vote = allVotes.find(v => (v.texto_expediente || "").toLowerCase().replace(/\s+/g, ' ').trim().includes("votación de conjunto del texto del proyecto de ley por la que se modifica la ley 28/1990"));
+      }
+      // USER REQUEST: Ley 8/2025 Navegación Aérea
+      else if (cleanTitle.includes("ley 8/2025") && cleanTitle.includes("navegación aérea")) {
+        vote = allVotes.find(v => (v.texto_expediente || "").toLowerCase().replace(/\s+/g, ' ').trim().includes("votación del dictamen del proyecto de ley por la que se modifican la ley 48/1960"));
+      }
+      // USER REQUEST: Proposición Ley Orgánica 4/2000 (Inmigración/VOX)
+      else if (cleanTitle.includes("ley orgánica 4/2000") && cleanTitle.includes("inmigrantes ilegales")) {
+        vote = allVotes.find(v => (v.texto_expediente || "").toLowerCase().replace(/\s+/g, ' ').trim().includes("proposición de ley del grupo parlamentario vox, orgánica de modificación de la ley orgánica 4/2000"));
+      }
+      // USER REQUEST: Escolarización necesidades especiales
+      else if (cleanTitle.includes("escolarización del alumnado") && cleanTitle.includes("necesidades educativas especiales")) {
+        vote = allVotes.find(v => (v.texto_expediente || "").toLowerCase().replace(/\s+/g, ' ').trim().includes("proposición de ley del grupo parlamentario popular en el congreso, relativa a la escolarización del alumnado con necesidades educativas especiales"));
+      }
+      // USER REQUEST: Proposición Ley Orgánica 5/2000 (Menores/VOX)
+      else if (cleanTitle.includes("ley orgánica 5/2000") && cleanTitle.includes("menores")) {
+        vote = allVotes.find(v => (v.texto_expediente || "").toLowerCase().replace(/\s+/g, ' ').trim().includes("proposición de ley del grupo parlamentario vox, orgánica por la que se modifica la ley orgánica 5/2000"));
+      }
+      // USER REQUEST: Matrimonio forzado (VOX)
+      else if (cleanTitle.includes("matrimonio forzado") && cleanTitle.includes("código penal")) {
+        vote = allVotes.find(v => (v.texto_expediente || "").toLowerCase().replace(/\s+/g, ' ').trim().includes("proposición de ley del grupo parlamentario vox, orgánica de modificación de la ley orgánica 10/1995, de 23 de noviembre, del código penal, para el endurecimiento de las penas del delito de matrimonio forzado"));
+      }
+      // USER REQUEST: Narcotráfico / Combustibles (VOX)
+      else if (cleanTitle.includes("combustibles líquidos") && cleanTitle.includes("narcotráfico")) {
+        vote = allVotes.find(v => (v.texto_expediente || "").toLowerCase().replace(/\s+/g, ' ').trim().includes("proposición de ley del grupo parlamentario vox, orgánica por la que se modifica la ley orgánica 10/1995, de 23 de noviembre, del código penal, al objeto de tipificar penalmente el transporte y almacenamiento de combustibles líquidos predeterminados al narcotráfico"));
+      }
+      // USER REQUEST: Servicios públicos / Municipios rurales (PP)
+      else if (cleanTitle.includes("municipios rurales") && cleanTitle.includes("emergencia")) {
+        vote = allVotes.find(v => (v.texto_expediente || "").toLowerCase().replace(/\s+/g, ' ').trim().includes("proposición de ley del grupo parlamentario popular en el congreso, para garantizar la prestación de los servicios públicos esenciales a los municipios rurales de pequeño tamaño en situaciones de emergencia de interés nacional"));
+      }
+      // USER REQUEST: Jornada laboral 37.5 horas / Desconexión
+      else if (cleanTitle.includes("jornada ordinaria de trabajo") && cleanTitle.includes("desconexión")) {
+        // Matching "Votación conjunta de las enmiendas a la totalidad de devolución al Proyecto de Ley..."
+        vote = allVotes.find(v => (v.texto_expediente || "").toLowerCase().replace(/\s+/g, ' ').trim().includes("votación conjunta de las enmiendas a la totalidad de devolución al proyecto de ley para la reducción de la duración máxima de la jornada ordinaria de trabajo"));
+      }
+      else {
+        // 1. Exact Match (All occurrences)
+        let matches = allVotes.filter(v => {
+          if (!cleanTitle) return false;
+          const vText = (v.texto_expediente || "").toLowerCase().replace(/\s+/g, ' ').trim();
+          return vText.includes(cleanTitle);
+        });
+
+        // 2. Loose Match (Common prefixes removed)
+        if (matches.length === 0) {
+          // Remove common legislative prefixes to find core subject
+          const coreTitle = cleanTitle
+            .replace(/proposición de ley/g, "")
+            .replace(/proyecto de ley/g, "")
+            .replace(/orgánica/g, "")
+            .replace(/para la/g, "")
+            .replace(/por la que se/g, "")
+            .replace(/\s+/g, " ")
+            .trim();
+
+          if (coreTitle.length > 15) {
+            matches = allVotes.filter(v => {
+              const vText = (v.texto_expediente || "").toLowerCase().replace(/\s+/g, ' ').trim();
+              return vText.includes(coreTitle);
+            });
+          }
+        }
+
+        // If multiple matches, take the last one
+        if (matches.length > 0) {
+          vote = matches[matches.length - 1];
+        }
+      }
+
+      processed.push({
+        id: ini.id || Math.random(),
+        titulo: ini.titulo,
+        tipo: normalizedType,
+        status: status,
+        color: categoryConfig[status].color,
+        data: ini,
+        resultOverride: resultOverride,
+        customNote: customNote,
+        voteData: vote ? {
+          si: parseInt(vote.a_favor) || 0,
+          no: parseInt(vote.en_contra) || 0,
+          abs: parseInt(vote.abstenciones) || 0,
+          nv: parseInt(vote.no_votan) || 0
+        } : null,
+        x: size.width / 2 + (Math.random() - 0.5) * 50,
+        y: size.height / 2 + (Math.random() - 0.5) * 50,
+        r: isMobile ? 3 : 4.5
+      });
+    });
+
+    // SIMULATIONS
+    const simulationCloud = d3.forceSimulation(processed)
+      .force("charge", d3.forceManyBody().strength(-2))
+      .force("center", d3.forceCenter(size.width / 2, size.height / 2))
+      .force("collide", d3.forceCollide(d => d.r + 1))
+      .stop();
+    for (let i = 0; i < 120; i++) simulationCloud.tick();
+    processed.forEach(n => { n.cloudX = n.x; n.cloudY = n.y; });
+
+    const colWidth = size.width / catKeys.length;
+    const simulationCluster = d3.forceSimulation(processed)
+      .force("x", d3.forceX(d => {
+        const idx = catKeys.indexOf(d.status);
+        return (idx + 0.5) * colWidth;
+      }).strength(0.8))
+      .force("y", d3.forceY(size.height / 2).strength(0.2))
+      .force("collide", d3.forceCollide(d => d.r + 1))
+      .stop();
+    for (let i = 0; i < 150; i++) simulationCluster.tick();
+    processed.forEach(n => { n.clusterX = n.x; n.clusterY = n.y; });
+
+    return { nodes: processed, categories: catKeys };
+  }, [iniciativasData, size.width, size.height, isMobile, allVotes]);
+
 
 
   // Helper to lookup deputy data by seat ID
@@ -869,7 +1302,7 @@ export default function App() {
     const isExtra = (d) => d.gobierno === 1 && !d.asiento;
 
     // Look for deputy
-    let found = diputadosData.find(d => d.asiento === seatId);
+    let found = diputadosData.find(d => d.asiento == seatId);
     if (!found) {
       // Try to find extra by virtual ID
       if (seatId >= 10000) {
@@ -969,11 +1402,13 @@ export default function App() {
   // Starts after Explosion finishes and "No todos" message has appeared.
   const departureStartY = 3500;
   // Much longer scroll to allow slow, delayed animations per item
-  const departureEndY = 20000;
+  const departureEndY = 28000;
   const departureProgress = Math.min(1, Math.max(0, (scrollY - departureStartY) / (departureEndY - departureStartY)));
 
   const sortedDepartures = useMemo(() => {
     return [...diputadosBajaData].sort((a, b) => {
+      if (!a.fecha_baja) return 1;
+      if (!b.fecha_baja) return -1;
       const dateA = parseJsonDate(a.fecha_baja);
       const dateB = parseJsonDate(b.fecha_baja);
       return dateA - dateB;
@@ -1033,19 +1468,22 @@ export default function App() {
   }, []);
 
   const approvedStats = useMemo(() => {
-    let counts = { leyes: 0, reales: 0, organicas: 0 };
-    iniciativasData.forEach(d => {
-      const title = (d.titulo || "").trim();
-      if (d.tipo === "Leyes") counts.leyes++;
-      else if (d.tipo === "Reales decretos" && title.startsWith("Real Decreto-ley")) counts.reales++;
-      else if (d.tipo === "Leyes organicas" && title.startsWith("Ley Orgánica")) counts.organicas++;
-    });
+    const leyesCount = iniciativasData.filter(d => d.tipo === "Leyes").length;
 
-    // Use same palette/colors or specific ones
+    // Filter Reales decretos -> Title must start with "Real Decreto-ley"
+    const realesCount = iniciativasData.filter(d =>
+      d.tipo === "Reales decretos" && (d.titulo || "").startsWith("Real Decreto-ley")
+    ).length;
+
+    // Filter Leyes organicas -> Title must start with "Ley Orgánica" (to avoid 'Proyectos' etc if misclassification happens)
+    const organicasCount = iniciativasData.filter(d =>
+      (d.tipo === "Leyes organicas" || d.tipo === "Leyes orgánicas") && (d.titulo || "").startsWith("Ley Orgánica")
+    ).length;
+
     return [
-      { label: "Leyes", count: counts.leyes, color: "#111" },
-      { label: "Reales decretos", count: counts.reales, color: "#333" },
-      { label: "Leyes orgánicas", count: counts.organicas, color: "#555" }
+      { label: "Leyes", count: leyesCount, color: "#111" },
+      { label: "Reales decretos", count: realesCount, color: "#505050" },
+      { label: "Leyes orgánicas", count: organicasCount, color: "#cccccc" }
     ];
   }, []);
 
@@ -1054,11 +1492,50 @@ export default function App() {
   const projectCount = useMemo(() => iniciativasData.filter(d => d.tipo === "Proyecto de ley").length, []);
   const maxCount = useMemo(() => Math.max(...initiativesCounts.map(d => d.count)), [initiativesCounts]);
 
-  // Initiatives Section Progress
-  const initStartY = 20000; // Starts right where departures end
-  const initEndY = 26000;
+  // Phase 1: Initial bars (Proposiciones, Proyectos, Reforma)
+  // Initiatives bars animation progress
+  // Stats phase: 
+  // 0.85-0.92: Counters count up to 100%
+  // 0.88-0.90: Fade out
+  // 0.90+: Bars grow (extended range for linear growth)
+  const barsStartProgress = 0.95; // Bars start appearing after stats fade
+  const barsEndProgress = 1.0; // Bars reach 100% at end (0.10 range)
+  const barsOpacity = departureProgress >= barsStartProgress
+    ? Math.min(1, (departureProgress - barsStartProgress) / (barsEndProgress - barsStartProgress))
+    : 0;
+
+  // Bar growth progress: grows from 0 to 1, but we extend the actual scroll range
+  // by using a wider departureProgress range mapping
+  // departureProgress 0.90-1.0 maps to barsProgress 0-1, but we need MORE granularity
+  // Solution: use a smaller end value to stretch the range
+  const barsGrowthProgress = departureProgress >= 0.95
+    ? Math.min(1, (departureProgress - 0.95) / (1.0 - 0.95))
+    : 0;
+
+  // Use barsGrowthProgress for the counter and bar height
+  const barsProgress = barsOpacity > 0 ? barsGrowthProgress : 0;
+
+  // Vertical movement: bars move UP as scroll continues AFTER they appear
+  // They should move from bottom to top smoothly
+  // Start moving up when bars are fully visible (departureProgress >= 1.0, which means scrolling past departure section)
+  const barsVerticalStart = 27000; // Start moving when bars fully visible
+  const barsVerticalRange = 5000; // Distance to move up over this scroll range
+  const barsVerticalProgress = Math.max(0, (scrollY - barsVerticalStart) / barsVerticalRange);
+  const barsVerticalOffset = barsVerticalProgress * 100; // Move from 0 to 100% up
+
+  // Initiatives Section Progress (needed for phase 2 bars)
+  const initStartY = 28000; // Starts right where departures end
+  const initEndY = 34000;
   const initProgressRaw = Math.max(0, (scrollY - initStartY) / (initEndY - initStartY));
   const initProgress = Math.min(1, initProgressRaw);
+
+  // Phase 2: Approved bars transition (after user scrolls past phase 1)
+  // When initProgress reaches a certain point (after bars are fully shown), swap to approved stats
+  const approvedBarsStartProgress = 0.2; // Start transition when initProgress hits 0.2
+  const approvedBarsEndProgress = 0.35; // Fade to approved bars at 0.35
+  const approvedBarsOpacity = initProgress >= approvedBarsStartProgress
+    ? Math.min(1, (initProgress - approvedBarsStartProgress) / (approvedBarsEndProgress - approvedBarsStartProgress))
+    : 0;
 
   // subtitleMix Logic (Lifted for Title access)
   // Constants must match SwarmOverlay logic exactly
@@ -1077,13 +1554,13 @@ export default function App() {
   // Final Phase: Chaotic Fall (Global for Title)
   // Final Phase: Chaotic Fall (Global for Title)
   const _chaosStart = _projectHold + _projectRange + 0.1;
-  const _chaosRange = 0.4;
+  const _chaosRange = 0.3; // Slightly faster fall
   const _rawChaosProgress = (initProgressRaw - (1 + _chaosStart)) / _chaosRange;
   const _chaosProgress = Math.min(1, Math.max(0, _rawChaosProgress));
   const chaosEase = _chaosProgress * _chaosProgress;
 
   // Approved Laws Phase (After Chaos)
-  const _approvedStart = _chaosStart + _chaosRange + 0.2; // Start after particles have fallen
+  const _approvedStart = _chaosStart + _chaosRange + 0.05; // Start SOONER after chaos
   const _approvedRange = 0.4; // Duration of fade in / count up
   const _rawApprovedProgress = (initProgressRaw - (1 + _approvedStart)) / _approvedRange;
   const _approvedProgress = Math.min(1, Math.max(0, _rawApprovedProgress));
@@ -1091,6 +1568,14 @@ export default function App() {
 
 
 
+
+  if (view === 'database') {
+    return <InitiativesTable onBack={() => setView('story')} />;
+  }
+
+  if (view === 'deputies') {
+    return <DeputiesTable onBack={() => setView('story')} />;
+  }
 
   return (
     <div className="app-container">
@@ -1104,6 +1589,7 @@ export default function App() {
           isMobile={isMobile}
           viewportWidth={size.width}
           viewportHeight={size.height}
+          interventionsMap={interventionsMap}
         />
 
         {/* FILTER CONTROLS */}
@@ -1123,6 +1609,8 @@ export default function App() {
           gap: '8px',
           alignItems: 'center'
         }}>
+
+
           <span style={{ fontSize: '12px', fontWeight: 600, color: '#666', marginRight: '4px' }}>AGRUPAR POR:</span>
           <button
             onClick={() => setGroupingCriteria('g_par')}
@@ -1130,7 +1618,7 @@ export default function App() {
               background: groupingCriteria === 'g_par' ? '#111' : '#eee',
               color: groupingCriteria === 'g_par' ? '#fff' : '#333',
               border: 'none', padding: '6px 12px', borderRadius: '12px', cursor: 'pointer', fontSize: '12px', fontWeight: 500
-            }}>Grupo</button>
+            }}>Grupo parlamentario</button>
           <button
             onClick={() => setGroupingCriteria('partido')}
             style={{
@@ -1196,12 +1684,31 @@ export default function App() {
             >
               ✕
             </button>
+
+            <div style={{
+              width: '80px', height: '80px', borderRadius: '50%', overflow: 'hidden', marginBottom: '12px', marginTop: '12px', border: '3px solid #f3f4f6', boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+            }}>
+              <img
+                src={`/images/diputados_img/${selectedDeputy.img || selectedDeputy.nombre.split(/[\s,]+/).join('_') + '.jpg'}`}
+                alt={selectedDeputy.nombre}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                onError={(e) => {
+                  // If image fails, try constructed name as fallback, or hide
+                  if (!e.target.src.includes(selectedDeputy.nombre.split(/[\s,]+/).join('_'))) {
+                    e.target.src = `/images/diputados_img/${selectedDeputy.nombre.split(/[\s,]+/).join('_')}.jpg`;
+                  } else {
+                    e.target.style.display = 'none'; e.target.parentElement.style.display = 'none';
+                  }
+                }}
+              />
+            </div>
+
             <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '28px', margin: '0 0 8px', color: '#111' }}>
               {selectedDeputy.formattedName}
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <p style={{ margin: 0, color: '#4b5563', fontSize: '16px' }}>
-                Diputado por <strong>{selectedDeputy.circunscripcion}</strong>
+                {selectedDeputy.trato} por <strong>{selectedDeputy.circunscripcion}</strong>
               </p>
               <p style={{ margin: 0, color: '#111827', fontWeight: 500, fontSize: '16px' }}>
                 {selectedDeputy.fullPartyName}
@@ -1209,6 +1716,73 @@ export default function App() {
               <p style={{ margin: '8px 0 0', color: '#6b7280', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Grupo Parlamentario {selectedDeputy.g_par}
               </p>
+
+              {/* Voting Summary Block */}
+              {votesByDeputy[String(selectedDeputy.id)] && (
+                <div style={{ marginTop: '20px', width: '100%', paddingTop: '16px', borderTop: '1px solid #f3f4f6' }}>
+                  <h4 style={{
+                    fontSize: '12px',
+                    margin: '0 0 12px',
+                    color: '#6b7280',
+                    fontFamily: 'var(--font-sans)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    fontWeight: 600
+                  }}>
+                    Resumen de votaciones
+                  </h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: isMobile ? '4px' : '8px' }}>
+                    {/* Helper for stats */}
+                    {[
+                      { l: 'Sí', c: votesByDeputy[String(selectedDeputy.id)].si, bg: '#dcfce7', txt: '#166534' },
+                      { l: 'No', c: votesByDeputy[String(selectedDeputy.id)].no, bg: '#fee2e2', txt: '#991b1b' },
+                      { l: 'Abs', c: votesByDeputy[String(selectedDeputy.id)].abs, bg: '#fef9c3', txt: '#854d0e' },
+                      { l: 'NV', c: votesByDeputy[String(selectedDeputy.id)].nv, bg: '#f3f4f6', txt: '#374151' }
+                    ].map((item) => (
+                      <div key={item.l} style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        backgroundColor: item.bg,
+                        borderRadius: '8px',
+                        padding: '8px 4px'
+                      }}>
+                        <span style={{ fontSize: '16px', fontWeight: 700, color: item.txt, fontFamily: 'var(--font-serif)' }}>
+                          {item.c}
+                        </span>
+                        <span style={{ fontSize: '11px', color: item.txt, fontWeight: 500, opacity: 0.8 }}>
+                          {item.l}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Interventions Summary */}
+              {interventionsMap[selectedDeputy.nombre] !== undefined && interventionsMap[selectedDeputy.nombre] > 0 && (
+                <div style={{ marginTop: '16px', width: '100%', paddingTop: '16px', borderTop: '1px solid #f3f4f6' }}>
+                  <h4 style={{
+                    fontSize: '12px',
+                    margin: '0 0 12px',
+                    color: '#6b7280',
+                    fontFamily: 'var(--font-sans)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    fontWeight: 600
+                  }}>
+                    Tiempo de intervención
+                  </h4>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', justifyContent: 'center' }}>
+                    <span style={{ fontSize: '24px', fontWeight: 700, color: '#111', fontFamily: 'var(--font-serif)' }}>
+                      {Math.floor(interventionsMap[selectedDeputy.nombre] / 60)}<span style={{ fontSize: '16px', fontWeight: 400 }}>h</span> {interventionsMap[selectedDeputy.nombre] % 60}<span style={{ fontSize: '16px', fontWeight: 400 }}>m</span>
+                    </span>
+                    <span style={{ fontSize: '14px', color: '#666' }}>
+                      totales intervenidos
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1228,21 +1802,20 @@ export default function App() {
         <div className="hero-inner">
           <div className="hero-centered">
             <header className="hero-content" style={cloudStyle}>
-              <h1 className="hero-title animate-enter">El hemiciclo</h1>
+              <h1 className="hero-title animate-enter">Dentro del Pleno</h1>
               <p className="hero-dek animate-enter delay-1">
-                Un análisis visual de la sede de la soberanía nacional
+                Crónica visual de un año en el hemiciclo
               </p>
               <p className="hero-credits animate-enter delay-2">
-                Descubre la distribución de los 350 diputados y el equilibrio
-                visual por cómo se movió la política española dentro del hemiciclo.
+                Votos, ausencias y equilibrios en el Congreso de los Diputados durante 2025.
               </p>
 
               <p className="hero-credits animate-enter delay-3">
-                Por <strong>J. Diego Quevedo</strong>
+                Por <strong>J. Diego Tejera Sosa</strong>
               </p>
               <div
                 className="scroll-hint animate-enter delay-4"
-                style={{ opacity: scrollHintOpacity }}
+                style={{ opacity: scrollHintOpacity, marginTop: '40vh', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}
               >
                 <span className="scroll-text">Desliza hacia abajo para comenzar</span>
                 <div className="scroll-icon">↓</div>
@@ -1251,12 +1824,12 @@ export default function App() {
           </div>
         </div>
       </div>
-      <div style={{ height: "50000px" }} className="scroll-section">
+      <div style={{ height: "41500px" }} className="scroll-section">
         <div
           className="nyt-info-box"
           style={{
             opacity: (scrollY > 350 && scrollY < 800 ? 1 : 0) * uiOpacity,
-            transform: scrollY > 350 ? 'translateY(0)' : 'translateY(20px)',
+            transform: scrollY > 350 ? (isMobile ? 'translateY(-20px)' : 'translateY(0)') : 'translateY(20px)',
             pointerEvents: scrollY > 350 && scrollY < 800 ? 'auto' : 'none'
           }}
         >
@@ -1270,14 +1843,82 @@ export default function App() {
             pointerEvents: scrollY > 1600 ? 'auto' : 'none'
           }}
         >
-          <h2 className="search-header">
+          <h2 className="search-header" style={{
+            fontSize: isMobile ? '24px' : undefined,
+            transform: isMobile ? 'translateY(-30px)' : undefined,
+            marginBottom: isMobile ? '4px' : undefined
+          }}>
             Conoce a los diputados
           </h2>
-          <input
-            type="text"
-            className="search-input"
-            placeholder="Buscar diputado..."
-          />
+          <div style={{ position: 'relative', width: '100%', maxWidth: '400px', margin: '0 auto', transform: isMobile ? 'translateY(-30px)' : undefined }}>
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Buscar diputado..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onFocus={() => setIsSearchFocused(true)}
+              onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
+              style={{
+                width: '100%',
+                fontSize: isMobile ? '14px' : undefined,
+                padding: isMobile ? '10px 16px' : undefined
+              }}
+            />
+            {isSearchFocused && searchResults.length > 0 && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                marginTop: '8px',
+                backgroundColor: 'white',
+                borderRadius: '12px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                padding: '8px 0',
+                display: 'flex',
+                flexDirection: 'column',
+                zIndex: 50,
+                maxHeight: '400px',
+                overflowY: 'auto',
+                textAlign: 'left'
+              }}>
+                {searchResults.slice(0, isMobile ? 2 : 3).map(d => (
+                  <div
+                    key={d.id}
+                    onClick={() => {
+                      const dep = getDeputyData(d.asiento ? parseInt(d.asiento) : getVirtualSeatId(d.id));
+                      setSelectedDeputy(dep);
+                      setSearchTerm("");
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      transition: 'background 0.2s',
+                    }}
+                    onMouseEnter={(e) => e.target.style.background = '#f3f4f6'}
+                    onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                  >
+                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, background: '#eee' }}>
+                      <img
+                        src={`/images/diputados_img/${d.img || d.nombre.split(/[\s,]+/).join('_') + '.jpg'}`}
+                        alt=""
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '14px', fontWeight: 500, color: '#111' }}>{formatName(d.nombre)}</span>
+                      <span style={{ fontSize: '12px', color: '#666' }}>{d.partido} · {d.circunscripcion}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Final Message */}
@@ -1308,7 +1949,7 @@ export default function App() {
             fontWeight: 700,
             margin: 0
           }}>
-            No todos los que empezaron en enero terminan 2025 como diputado
+            No todos los escaños llegan a diciembre con la misma persona
           </h2>
         </div>
 
@@ -1331,7 +1972,7 @@ export default function App() {
             // Faster: Fills in first 20% (approx 4000px of scroll)
             transform: `scaleY(${Math.min(1, departureProgress * 5)})`,
             // Fade out at the very end (last 5% of scroll)
-            opacity: departureProgress > 0.78 ? (1 - (departureProgress - 0.78) * 20) : 1,
+            opacity: departureProgress > 0.88 ? (1 - (departureProgress - 0.88) * 80) : 1,
             transition: 'transform 0.1s linear, opacity 0.5s',
             zIndex: 49
           }} />
@@ -1349,7 +1990,7 @@ export default function App() {
             fontFamily: 'var(--font-serif)',
             fontSize: isMobile ? '14px' : '18px',
             lineHeight: 1.4,
-            color: '#666',
+            color: '#000000',
             // Appear a bit after line starts (0.01)
             // Fade out smoothly starting at 0.15, gone by 0.18
             opacity: Math.max(0, Math.min(1, (departureProgress - 0.01) * 10)) * Math.max(0, 1 - (departureProgress - 0.01) * 2),
@@ -1357,7 +1998,7 @@ export default function App() {
             transition: 'opacity 0.2s',
             zIndex: 48
           }}>
-            Estos fueron los 10 diputados que causaron baja durante 2025
+            Estos fueron los 10 diputados que causaron baja (y uno suspendido) durante 2025
           </div>
 
           {sortedDepartures.map((d, i) => {
@@ -1427,6 +2068,7 @@ export default function App() {
                       if (d.nombre.includes('Guijarro')) return isMobile ? '0' : '-80px';
                       if (d.nombre.includes('Casares')) return isMobile ? '-40px' : '-140px';
                       if (d.nombre.includes('Herranz')) return isMobile ? '-50px' : '-150px';
+                      if (d.nombre.includes('Ábalos')) return isMobile ? '-60px' : '-200px';
                       return (isLeft && isMobile) ? '-10px' : '0';
                     })(),
                     marginRight: (() => {
@@ -1478,7 +2120,9 @@ export default function App() {
                   </div>
 
                   <div style={{ fontSize: isMobile ? '13px' : '16px', color: '#111', fontWeight: 500 }}>
-                    Baja el {parseJsonDate(d.fecha_baja).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    {d.fecha_baja
+                      ? `Baja el ${parseJsonDate(d.fecha_baja).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}`
+                      : 'Suspensión de derechos como diputado'}
                   </div>
 
                   <div style={{ width: '40px', height: '2px', background: '#e5e7eb', margin: isMobile ? '4px 0' : '8px 0' }} />
@@ -1496,25 +2140,35 @@ export default function App() {
             (() => {
               // Stats Logic
               // Appear after line fades (0.83). safe start 0.85.
-              // Animate counters from 0.85 to 0.95.
-              const startStats = 0.85;
-              const endStats = 1.0;
+              // Animate counters from 0.85 to 0.92 (reach 100%)
+              // Stay visible from 0.92 to 0.88 (pause) - shortened
+              // Fade out from 0.88 to 0.90 (completely gone before bars start)
+              const startStats = 0.90;
+              const endCounters = 0.94; // Counters reach 100% here
+              const startFadeOut = 0.96; // Start fading earlier
+              const completeFadeOut = 0.975; // Completely gone before bars start at 0.90
 
-              let statsOpacity = 0;
-              if (departureProgress > startStats) {
-                statsOpacity = Math.min(1, (departureProgress - startStats) * 10); // Fade in over 0.1
-                // Fade out at the very end, slightly after counters finish (0.97 to 1.0)
-                if (departureProgress > 0.97) {
-                  statsOpacity *= Math.max(0, 1 - (departureProgress - 0.97) * 33);
-                }
+              let statsOpacity = 1;
+
+              // Fade in
+              if (departureProgress < startStats) {
+                statsOpacity = 0;
+              } else if (departureProgress < endCounters) {
+                statsOpacity = Math.min(1, (departureProgress - startStats) * 50); // Fade in faster (fully visible by 0.92)
+              } else if (departureProgress < startFadeOut) {
+                statsOpacity = 1; // Stay visible (pause)
+              } else if (departureProgress < completeFadeOut) {
+                statsOpacity = Math.max(0, 1 - (departureProgress - startFadeOut) / (completeFadeOut - startFadeOut)); // Fade out
+              } else {
+                statsOpacity = 0;
               }
 
-              // Counter Progress (0 to 1)
-              const countP = Math.min(1, Math.max(0, (departureProgress - startStats) / 0.1));
+              // Counter Progress (0 to 1) - reaches 100% at 0.92
+              const countP = Math.min(1, Math.max(0, (departureProgress - startStats) / (endCounters - startStats)));
 
               // Counters
-              const countSesiones = Math.floor(countP * 76);
-              const countVotaciones = Math.floor(countP * 48);
+              const countSesiones = Math.floor(countP * 66);
+              const countVotaciones = Math.floor(countP * 50);
 
               return (
                 <div style={{
@@ -1532,709 +2186,694 @@ export default function App() {
                   pointerEvents: statsOpacity > 0 ? 'auto' : 'none'
                 }}>
                   <div style={{ fontSize: isMobile ? '28px' : '48px', lineHeight: 1.2, marginBottom: '20px' }}>
-                    Este 2025 se celebraron <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', display: 'inline-block', minWidth: '2ch', textAlign: 'center' }}>{countSesiones}</span> sesiones plenarias.
+                    En 2025 hubo <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', display: 'inline-block', minWidth: '2ch', textAlign: 'center' }}>{countSesiones}</span> sesiones plenarias.
                   </div>
-                  <div style={{ fontSize: isMobile ? '28px' : '48px', lineHeight: 1.2, color: '#444' }}>
-                    En <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', display: 'inline-block', minWidth: '2ch', textAlign: 'center' }}>{countVotaciones}</span> de ellas hubo votaciones.
+                  <div style={{ fontSize: isMobile ? '28px' : '48px', lineHeight: 1.2, color: '#000' }}>
+                    En <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', display: 'inline-block', minWidth: '2ch', textAlign: 'center' }}>{countVotaciones}</span> se votó.
                   </div>
                 </div>
               );
             })()
           }
 
-          {/* Initiatives Visualization */}
+          {/* Animated Bars for Initiative Types */}
           {(() => {
-            // Visible when previous stats fade (departureProgress > 0.98 -> initProgress > 0)
-            const showInit = initProgress > 0;
-            if (!showInit) return null;
+            // Always show bars, but they transition between phases
+            // Phase 1: Proposiciones, Proyectos, Reforma (barsOpacity controls visibility)
+            // Phase 2: Leyes, Reales decretos, Leyes orgánicas (approvedBarsOpacity controls transition)
 
-            const maxCount = Math.max(...initiativesCounts.map(c => c.count));
-            // Fade in 0->0.2
-            const opacity = Math.min(1, initProgress * 5);
-            // Focus Logic for Title
-            // Focus Logic for Title
-            const focusStart = 0.7;
-            const focusP = Math.min(1, Math.max(0, (initProgress - focusStart) / 0.25)); // 0 to 1, clamped
+            // Determine which data set to show based on phase progress
+            const phase1Opacity = barsOpacity * (1 - approvedBarsOpacity);
+            const phase2Opacity = approvedBarsOpacity;
+
+            // Fade out bars section before swarm appears
+            // Swarm starts earlier now. Let's start fading bars out at 30500 to be gone by 31300
+            const barsExitStart = 30500;
+            const barsExitEnd = 31300;
+            const barsExitProgress = Math.min(1, Math.max(0, (scrollY - barsExitStart) / (barsExitEnd - barsExitStart)));
+            const barsExitOpacity = 1 - barsExitProgress;
+
+            if (barsOpacity === 0 && approvedBarsOpacity === 0) return null;
 
             return (
               <div style={{
-                position: 'absolute',
+                position: 'fixed',
                 top: '50%',
                 left: '50%',
                 transform: 'translate(-50%, -50%)',
                 width: '90%',
-                maxWidth: '1000px',
-                height: '700px',
+                maxWidth: '900px',
+                height: 'auto',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 52,
-                zIndex: 52,
-                opacity: opacity * (1 - chaosEase),
-                pointerEvents: opacity > 0 ? 'auto' : 'none'
+                justifyContent: 'flex-end',
+                gap: '30px',
+                zIndex: 51,
+                opacity: barsOpacity * barsExitOpacity, // Multiply by exit opacity
+                transition: 'none',
+                pointerEvents: (barsOpacity * barsExitOpacity > 0.1) ? 'auto' : 'none'
               }}>
-                {/* Title */}
-                <div style={{ position: 'relative', width: '100%', height: 'auto', marginBottom: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <h2 style={{
+                {/* Title - changes based on phase */}
+                <div style={{
+                  textAlign: 'center',
+                  opacity: 1
+                }}>
+                  <h3 style={{
                     fontFamily: 'var(--font-serif)',
-                    fontSize: isMobile ? '24px' : '36px',
+                    fontSize: isMobile ? '20px' : '28px',
                     fontWeight: 700,
                     margin: 0,
-                    textAlign: 'center',
                     color: '#111',
-                    opacity: opacity
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.3em'
                   }}>
-                    {_approvedProgress > 0.1 ? "Se aprobaron un total de" : "Se presentaron un total de"}
-                  </h2>
+                    <span>Se</span>
+                    <span style={{
+                      display: 'inline-grid',
+                      gridTemplateAreas: '"stack"',
+                      alignItems: 'center',
+                      justifyItems: 'center'
+                    }}>
+                      <span style={{
+                        gridArea: 'stack',
+                        opacity: 1 - approvedBarsOpacity,
+                        transition: 'none', // Driven directly by scroll
+                      }}>presentaron</span>
+                      <span style={{
+                        gridArea: 'stack',
+                        opacity: approvedBarsOpacity,
+                        transition: 'none', // Driven directly by scroll
+                      }}>aprobaron</span>
+                    </span>
+                    <span>un total de</span>
+                  </h3>
 
-                  {/* Counter appearing during focus */}
+                  {/* Subtitle with total count - always rendered to reserve space, fades in */}
                   <div style={{
-                    marginTop: '10px',
-                    fontFamily: 'var(--font-serif)',
-                    fontSize: isMobile ? '28px' : '48px',
+                    marginTop: '16px',
+                    fontSize: isMobile ? '28px' : '42px',
+                    fontWeight: 700,
                     color: '#111',
-                    opacity: Math.min(1, focusP * 2), // Fade in quickly
-                    transform: `translateY(${20 - focusP * 20}px)`, // Slide up
-                    transition: 'opacity 0.2s, transform 0.2s',
-                    textAlign: 'center',
-                    position: 'relative',
-                    minHeight: isMobile ? '48px' : '60px'
+                    fontVariantNumeric: 'tabular-nums',
+                    opacity: phase2Opacity, // Fades in during Phase 2
+                    transition: 'opacity 0.2s'
                   }}>
-                    <span style={{ position: 'relative', display: 'inline-block' }}>
-                      <span style={{
-                        position: 'absolute',
-                        inset: 0,
-                        opacity: 1 - subtitleMix,
-                        transition: 'opacity 0.2s'
-                      }}>
-                        <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-                          {Math.floor(focusP * initiativesCounts[0].count)}
-                        </span>{" "}
-                        <span style={{ fontSize: isMobile ? '20px' : '32px', fontWeight: 400 }}>
-                          proposiciones de ley
-                        </span>
-                      </span>
-
-                      <span style={{
-                        position: 'relative',
-                        opacity: subtitleMix,
-                        transition: 'opacity 0.2s'
-                      }}>
-                        <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-                          {Math.floor(focusP * projectCount)}
-                        </span>{" "}
-                        <span style={{ fontSize: isMobile ? '20px' : '32px', fontWeight: 400 }}>
-                          proyectos de ley
-                        </span>
-                      </span>
+                    {Math.floor(approvedStats.reduce((sum, item) => sum + item.count, 0))}
+                    <span style={{
+                      fontSize: isMobile ? '14px' : '18px',
+                      fontWeight: 500,
+                      color: '#666',
+                      marginLeft: '12px'
+                    }}>
+                      iniciativas legislativas
                     </span>
                   </div>
                 </div>
 
-                {/* Bars Container - Swaps data based on phase */}
+                {/* Bars - Morphing Strategy */}
                 <div style={{
                   display: 'flex',
                   alignItems: 'flex-end',
                   justifyContent: 'center',
-                  gap: isMobile ? '20px' : '60px',
-                  height: '100%',
-                  width: '100%'
+                  gap: isMobile ? '4px' : '50px',
+                  height: '280px',
+                  width: '100%',
+                  position: 'relative'
                 }}>
-                  {(_approvedProgress > 0.05 ? approvedStats : initiativesCounts).map((d, i) => {
-                    // Growth Logic switch
-                    // If approved phase: Use _approvedProgress
-                    // If init phase: Use initProgress
+                  {[0, 1, 2].map((index) => {
+                    const progress = approvedBarsOpacity; // 0 to 1 transition
 
-                    let progress = 0;
-                    let fade = 1;
+                    // Data
+                    const item1 = initiativesCounts[index];
+                    const item2 = approvedStats[index];
 
-                    if (_approvedProgress > 0.05) {
-                      // APPROVED PHASE 
-                      const growStart = 0.1 + i * 0.1;
-                      const duration = 0.4;
-                      const growEnd = growStart + duration;
-                      const growP = Math.min(1, Math.max(0, (_approvedProgress - growStart) / (growEnd - growStart)));
-                      progress = 1 - Math.pow(1 - growP, 3);
-                      fade = approvedPhaseEase;
-                    } else {
-                      // INIT PHASE
-                      const growStart = 0.1 + i * 0.1;
-                      const duration = d.count === 1 ? 0.2 : 0.4;
-                      const growEnd = growStart + duration;
-                      const growP = Math.min(1, Math.max(0, (initProgress - growStart) / (growEnd - growStart)));
-                      const easeGrow = 1 - Math.pow(1 - growP, 3);
-                      // Shrink Logic (0.7 -> 0.9) - "Vuelven a bajar"
-                      const shrinkStart = 0.7;
-                      const shrinkP = Math.min(1, Math.max(0, (initProgress - shrinkStart) / 0.2));
-                      progress = Math.max(0, easeGrow - shrinkP); // reuse heightP logic
-                      fade = 1 - shrinkP;
-                    }
+                    if (!item1 || !item2) return null;
 
+                    // Interpolate Value
+                    // Start at item1.count, end at item2.count
+                    const startVal = item1.count;
+                    const endVal = item2.count;
+                    const currentVal = startVal + (endVal - startVal) * progress;
 
-                    const barHeight = (d.count / maxCount) * (isMobile ? 250 : 400);
+                    // Display rounded value
+                    // Multiply by barsProgress to handle the initial "growth" animation from 0
+                    const displayVal = Math.floor(currentVal * barsProgress);
+
+                    // Interpolate Height
+                    // We keep the scale of Phase 1 (Max Value) to show the drop visually
+                    // If we re-scaled to Phase 2 max, the small numbers would look huge
+                    const maxScale = Math.max(...initiativesCounts.map(d => d.count));
+                    const targetHeight = (currentVal / maxScale) * 260; // 260px is max bar height
+                    const currentHeight = targetHeight * barsProgress;
 
                     return (
-                      <div key={i + (_approvedProgress > 0.05 ? '_app' : '_init')} style={{
+                      <div key={index} style={{
+                        position: 'relative',
+                        height: '100%',
+                        width: isMobile ? '100px' : '140px',
                         display: 'flex',
                         flexDirection: 'column',
-                        alignItems: 'center',
                         justifyContent: 'flex-end',
-                        height: '100%',
-                        opacity: fade,
-                        transition: 'opacity 0.2s linear'
+                        alignItems: 'center'
                       }}>
-
-                        {/* Number */}
+                        {/* Counter */}
                         <div style={{
                           fontFamily: 'var(--font-serif)',
-                          fontSize: isMobile ? '24px' : '48px',
+                          fontSize: isMobile ? '24px' : '42px',
                           fontWeight: 700,
-                          marginBottom: '12px',
-                          opacity: progress > 0.05 ? 1 : 0, // Hide when almost zero
-                          // Follow the bar top. Since Bar Container takes full space but scales visually,
-                          // we translate the number down by the empty space amount.
-                          transform: `translateY(${barHeight * (1 - progress)}px)`,
-                          // Remove transition for sync movement with scroll
-                          // transition: 'transform 0.1s linear', 
-                          color: d.color,
+                          marginBottom: '8px',
+                          color: item1.color,
                           fontVariantNumeric: 'tabular-nums',
-                          willChange: 'transform'
+                          minHeight: isMobile ? '28px' : '48px',
+                          textAlign: 'center'
                         }}>
-                          {Math.floor(progress * d.count)}
+                          {displayVal}
                         </div>
 
                         {/* Bar */}
                         <div style={{
-                          width: isMobile ? '60px' : '100px',
-                          height: `${Math.max(4, barHeight)}px`,
-                          position: 'relative',
-                          transformOrigin: 'bottom',
-                          transform: `scaleY(${progress})`,
-                          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                          borderRadius: '8px 8px 0 0',
-                          overflow: 'hidden'
-                        }}>
-                          <div style={{
-                            width: '100%',
-                            height: '100%',
-                            backgroundColor: d.color
-                          }} />
-                        </div>
+                          width: isMobile ? '50px' : '80px',
+                          height: `${Math.max(2, currentHeight)}px`, // Min 2px to be visible
+                          backgroundColor: item1.color,
+                          borderRadius: '4px 4px 0 0',
+                          boxShadow: `0 2px 12px ${item1.color}50`,
+                          transition: 'none' // Remove transition to sync perfectly with scroll
+                        }} />
 
-                        {/* Label */}
+                        {/* Labels Stack */}
                         <div style={{
-                          marginTop: '16px',
+                          marginTop: '12px',
                           textAlign: 'center',
                           fontFamily: 'var(--font-sans)',
-                          fontSize: isMobile ? '12px' : '16px',
+                          fontSize: isMobile ? '10px' : '14px',
                           fontWeight: 500,
-                          color: '#666',
-                          maxWidth: isMobile ? '80px' : '150px',
-                          lineHeight: 1.2,
-                          opacity: progress > 0.1 ? 1 : 0, // Fade out when small
-                          transition: 'opacity 0.2s'
+                          color: '#555',
+                          lineHeight: 1.1,
+                          display: 'grid',
+                          gridTemplateAreas: '"label"',
+                          alignItems: 'start',
+                          justifyItems: 'center',
+                          width: '100%'
                         }}>
-                          {d.label}
+                          <span style={{
+                            gridArea: 'label',
+                            opacity: 1 - progress,
+                            transition: 'none'
+                          }}>
+                            {item1.label}
+                          </span>
+                          <span style={{
+                            gridArea: 'label',
+                            opacity: progress,
+                            transition: 'none'
+                          }}>
+                            {item2.label}
+                          </span>
                         </div>
                       </div>
                     );
                   })}
-
-
-                  {/* CÍRCULOS (Swarm) - Aparecen al final (0.8 -> 1.0) */}
-                  {(() => {
-                    const swarmStart = 0.8;
-                    const swarmProgress = Math.min(1, Math.max(0, (initProgress - swarmStart) / 0.2));
-
-                    if (swarmProgress <= 0) return null;
-
-                    // --- Data Preparation ---
-                    const rawData = iniciativasData.filter(d => d.tipo === "Proposición de ley");
-                    const rawProjectData = iniciativasData.filter(d => d.tipo === "Proyecto de ley");
-
-                    const count = rawData.length;
-                    const projectCount = rawProjectData.length;
-
-                    const particles = rawData.map((d, i) => ({ ...d, globalIndex: i }));
-                    const projectParticles = rawProjectData.map((d, i) => ({ ...d, projectIndex: i }));
-
-                    // Tie particle reveal to the headline counter so the number and dots grow together
-                    const visibleCount = Math.min(
-                      particles.length,
-                      Math.max(0, Math.floor(focusP * initiativesCounts[0].count))
-                    );
-                    const revealProgress = particles.length
-                      ? Math.min(1, visibleCount / particles.length)
-                      : 0;
-
-                    const projectVisibleCount = Math.min(
-                      projectParticles.length,
-                      Math.max(0, Math.floor(focusP * projectCount))
-                    );
-                    const projectRevealProgress = projectParticles.length
-                      ? Math.min(1, projectVisibleCount / projectParticles.length)
-                      : 0;
-
-                    const size = isMobile ? 12 : 18;
-                    const spread = size + (isMobile ? 2 : 4);
-                    const domeOffsetY = isMobile ? -50 : 160;
-
-                    // Build cluster targets: first by situacion_actual, with Cerrado split by resultado_tramitacion
-                    const clusterGroups = [];
-
-                    const normalizedStatus = (statusRaw) => {
-                      const status = statusRaw || "Sin estado";
-                      const lower = status.toLowerCase();
-                      if (lower.includes("enmiendas") || lower.includes("informe")) {
-                        return "Enmiendas/Informe";
-                      }
-                      return status;
-                    };
-
-                    const statusGroups = d3.groups(particles, d => normalizedStatus(d.situacion_actual));
-                    statusGroups.sort((a, b) => b[1].length - a[1].length);
-
-                    statusGroups.forEach(([status, items]) => {
-                      if (status === "Cerrado") {
-                        const resultGroups = d3.groups(items, d => d.resultado_tramitacion || "Sin resultado");
-                        resultGroups.sort((a, b) => b[1].length - a[1].length);
-                        resultGroups.forEach(([resultLabel, resultItems]) => {
-                          clusterGroups.push({
-                            key: `${status}__${resultLabel}`,
-                            label: `${resultLabel}`,
-                            items: resultItems
-                          });
-                        });
-                      } else {
-                        clusterGroups.push({
-                          key: status || "Sin estado",
-                          label: status || "Sin estado",
-                          items
-                        });
-                      }
-                    });
-
-                    const projectClusterGroups = [];
-
-                    const projectStatusGroups = d3.groups(projectParticles, d => normalizedStatus(d.situacion_actual));
-                    projectStatusGroups.sort((a, b) => b[1].length - a[1].length);
-
-                    projectStatusGroups.forEach(([status, items]) => {
-                      if (status === "Cerrado") {
-                        const resultGroups = d3.groups(items, d => d.resultado_tramitacion || "Sin resultado");
-                        resultGroups.sort((a, b) => b[1].length - a[1].length);
-                        resultGroups.forEach(([resultLabel, resultItems]) => {
-                          projectClusterGroups.push({
-                            key: `${status}__${resultLabel}`,
-                            label: `${resultLabel}`,
-                            items: resultItems
-                          });
-                        });
-                      } else {
-                        projectClusterGroups.push({
-                          key: status || "Sin estado",
-                          label: status || "Sin estado",
-                          items
-                        });
-                      }
-                    });
-
-                    const clusterCols = clusterGroups.length <= 2 ? clusterGroups.length : (isMobile ? 2 : Math.min(4, Math.ceil(Math.sqrt(clusterGroups.length))));
-                    const clusterRows = clusterCols === 0 ? 0 : Math.ceil(clusterGroups.length / clusterCols);
-                    const clusterGapX = isMobile ? 200 : 320;
-                    const clusterGapY = isMobile ? 180 : 200;
-                    const clusterOriginY = domeOffsetY + (isMobile ? 220 : 140);
-
-                    const clusterTargets = new Map();
-                    const clusterLabels = [];
-
-                    const labelOverrides = {
-                      "Pleno Toma en consideración": "Pendiente de debate inicial en el Pleno",
-                      "Gobierno\nContestación": "En espera de respuesta del Gobierno previo al Pleno",
-                      "Mesa del Congreso\nAcuerdo subsiguiente a la toma en consideración": "En tramitación tras el sí del Pleno",
-                      "Rechazado": "Rechazadas",
-                      "Retirado": "Retiradas",
-                      "Enmiendas/Informe": "Plazo abierto para enmiendas o elaborando informes",
-                      "Decaído": "Decaídas",
-                      "Aprobado": "Aprobadas"
-                    };
-                    clusterGroups.forEach((group, idx) => {
-                      const col = idx % clusterCols;
-                      const row = Math.floor(idx / clusterCols);
-                      const offsetX = (col - (clusterCols - 1) / 2) * clusterGapX;
-                      const offsetY = (row - (clusterRows - 1) / 2) * clusterGapY + clusterOriginY;
-
-                      const displayLabel = labelOverrides[group.label] || group.label;
-                      const clusterRadius = spread * Math.sqrt(group.items.length);
-                      const labelOffset = clusterRadius + (isMobile ? 32 : 44);
-
-                      clusterLabels.push({
-                        key: group.key,
-                        label: displayLabel,
-                        x: offsetX,
-                        y: offsetY - labelOffset,
-                        count: group.items.length
-                      });
-
-                      group.items.forEach((item, localIdx) => {
-                        const thetaLocal = localIdx * 2.39996;
-                        const rLocal = spread * Math.sqrt(localIdx);
-                        const targetX = offsetX + rLocal * Math.cos(thetaLocal);
-                        const targetY = offsetY + rLocal * Math.sin(thetaLocal);
-                        clusterTargets.set(item.globalIndex, { x: targetX, y: targetY });
-                      });
-                    });
-
-                    const projectClusterCols = projectClusterGroups.length <= 2 ? projectClusterGroups.length : (isMobile ? 2 : Math.min(4, Math.ceil(Math.sqrt(projectClusterGroups.length))));
-                    const projectClusterRows = projectClusterCols === 0 ? 0 : Math.ceil(projectClusterGroups.length / projectClusterCols);
-                    const projectClusterTargets = new Map();
-                    const projectClusterLabels = [];
-
-                    projectClusterGroups.forEach((group, idx) => {
-                      const col = idx % projectClusterCols;
-                      const row = Math.floor(idx / projectClusterCols);
-                      const offsetX = (col - (projectClusterCols - 1) / 2) * clusterGapX;
-                      const offsetY = (row - (projectClusterRows - 1) / 2) * clusterGapY + clusterOriginY;
-
-                      const displayLabel = labelOverrides[group.label] || group.label;
-                      const clusterRadius = spread * Math.sqrt(group.items.length);
-                      const labelOffset = clusterRadius + (isMobile ? 32 : 44);
-
-                      projectClusterLabels.push({
-                        key: `proyecto__${group.key}`,
-                        label: displayLabel,
-                        x: offsetX,
-                        y: offsetY - labelOffset,
-                        count: group.items.length
-                      });
-
-                      group.items.forEach((item, localIdx) => {
-                        const thetaLocal = localIdx * 2.39996;
-                        const rLocal = spread * Math.sqrt(localIdx);
-                        const targetX = offsetX + rLocal * Math.cos(thetaLocal);
-                        const targetY = offsetY + rLocal * Math.sin(thetaLocal);
-                        projectClusterTargets.set(item.projectIndex, { x: targetX, y: targetY });
-                      });
-                    });
-
-                    // Build secondary cluster targets by autor (after a pause in scroll)
-                    const normalizeAuthor = (autorRaw) => {
-                      const author = (autorRaw || "Sin autor").trim();
-                      return author.length === 0 ? "Sin autor" : author;
-                    };
-
-                    const authorGroupsRaw = d3.groups(particles, d => normalizeAuthor(d.autor));
-                    authorGroupsRaw.sort((a, b) => b[1].length - a[1].length);
-
-                    const authorGroups = authorGroupsRaw.map(([label, items]) => ({
-                      key: `autor__${label}`,
-                      label,
-                      items
-                    }));
-
-                    const authorCols = authorGroups.length <= 2 ? authorGroups.length : (isMobile ? 2 : Math.min(4, Math.ceil(Math.sqrt(authorGroups.length))));
-                    const authorRows = authorCols === 0 ? 0 : Math.ceil(authorGroups.length / authorCols);
-                    const authorTargets = new Map();
-                    const authorLabels = [];
-
-                    authorGroups.forEach((group, idx) => {
-                      const col = idx % authorCols;
-                      const row = Math.floor(idx / authorCols);
-                      const offsetX = (col - (authorCols - 1) / 2) * clusterGapX;
-                      const offsetY = (row - (authorRows - 1) / 2) * clusterGapY + clusterOriginY;
-
-                      const displayLabel = normalizeAuthor(group.label).replace(/\s*\n\s*/g, " · ");
-                      const clusterRadius = spread * Math.sqrt(group.items.length);
-                      const labelOffset = clusterRadius + (isMobile ? 32 : 44);
-
-                      authorLabels.push({
-                        key: group.key,
-                        label: displayLabel,
-                        x: offsetX,
-                        y: offsetY - labelOffset,
-                        count: group.items.length
-                      });
-
-                      group.items.forEach((item, localIdx) => {
-                        const thetaLocal = localIdx * 2.39996;
-                        const rLocal = spread * Math.sqrt(localIdx);
-                        const targetX = offsetX + rLocal * Math.cos(thetaLocal);
-                        const targetY = offsetY + rLocal * Math.sin(thetaLocal);
-                        authorTargets.set(item.globalIndex, { x: targetX, y: targetY });
-                      });
-                    });
-
-                    // --- Animation Phases ---
-                    // 0.00 - 0.50: Dome Entry (all together)
-                    // 0.50 - 0.70: Hold the dome complete in center
-                    // >1.20: Separate into clusters (only after a post-122 scroll pause)
-                    const motionProgress = Math.min(1, swarmProgress / 0.5, revealProgress);
-                    const domeEase = 1 - Math.pow(1 - motionProgress, 3);
-
-                    // Delay cluster motion until after the dome is complete AND the user scrolls past a pause window.
-                    // This keeps particles resting in the finished circle before they start gliding to clusters.
-                    const clusterHold = 0.05; // extra scroll after 122 before motion starts
-                    const clusterScrollRange = 0.6; // scroll span dedicated to the cluster split
-                    const rawClusterProgress = revealProgress >= 1
-                      ? (initProgressRaw - (1 + clusterHold)) / clusterScrollRange
-                      : 0;
-                    const clusterProgress = Math.min(1, Math.max(0, rawClusterProgress));
-                    const clusterEase = 1 - Math.pow(1 - clusterProgress, 3);
-
-                    // Secondary regrouping: transition clusters to be organized by autor
-                    const authorHold = clusterHold + clusterScrollRange + 0.15; // small pause after first grouping
-                    const authorScrollRange = 0.6;
-                    const rawAuthorProgress = revealProgress >= 1
-                      ? (initProgressRaw - (1 + authorHold)) / authorScrollRange
-                      : 0;
-                    const authorProgress = Math.min(1, Math.max(0, rawAuthorProgress));
-                    const authorEase = 1 - Math.pow(1 - authorProgress, 3);
-
-                    // Tertiary regrouping: switch to proyectos de ley clustered by situacion_actual
-                    const projectHold = authorHold + authorScrollRange + 0.15; // pause after author clusters
-                    const projectScrollRange = 0.6;
-                    const rawProjectProgress = revealProgress >= 1
-                      ? (initProgressRaw - (1 + projectHold)) / projectScrollRange
-                      : 0;
-                    const projectProgress = Math.min(1, Math.max(0, rawProjectProgress));
-                    const projectEase = 1 - Math.pow(1 - projectProgress, 3);
-
-                    // Final Phase: Chaotic Fall
-                    const chaosStart = projectHold + projectScrollRange + 0.1;
-                    const chaosRange = 0.4; // Faster fall
-                    const rawChaosProgress = revealProgress >= 1
-                      ? (initProgressRaw - (1 + chaosStart)) / chaosRange
-                      : 0;
-                    const chaosProgress = Math.min(1, Math.max(0, rawChaosProgress));
-                    const chaosEase = chaosProgress * chaosProgress; // Accelerate down
-
-                    const subtitleMix = projectEase;
-
-                    return (
-                      <div style={{
-                        position: 'absolute',
-                        inset: 0,
-                        pointerEvents: 'none',
-                        zIndex: 50
-                      }}>
-                        {particles.map((p, i) => {
-                          if (i >= visibleCount) return null;
-
-                          // 1. DOME (Center)
-                          const seed = i * 492.34;
-                          const startAngle = (seed % (Math.PI * 2)) + i;
-                          const startR = 1200 + (seed % 600);
-                          const startX = Math.cos(startAngle) * startR;
-                          const startY = Math.sin(startAngle) * startR;
-
-                          // Destination: Phyllotaxis Spiral (Circular Packing)
-                          // Golden Angle
-                          const theta = i * 2.39996;
-                          const r = spread * Math.sqrt(i);
-
-                          const domeX = r * Math.cos(theta);
-                          const domeY = r * Math.sin(theta) + domeOffsetY; // Dome Centered
-
-                          // 3D Dome Effect Logic
-                          // Calculate "height" (z) of the sphere at this radius
-                          // i=0 is center (high Z), i=count is edge (low Z)
-                          const maxI = count - 1;
-                          const normDist = Math.sqrt(i / maxI); // 0..1 (Radius normalized)
-                          const sphereZ = Math.sqrt(1 - normDist * normDist); // 1..0 (Hemisphere height)
-
-                          // Scale based on Z to simulate perspective/curvature
-                          // Center (Top of dome) = Larger
-                          // Edge (Horizon) = Smaller
-                          const scaleDome = 0.6 + 0.6 * sphereZ;
-
-                          // Interpolate Position
-                          // EaseOutCubic
-                          // Drive entry so that all particles meet and hold in the dome
-                          const ease = domeEase;
-
-                          // If progress is small, opacity is small
-                          // Staggered reveal per particle (reduces "instant" pop-in)
-                          const particleRevealStart = i / count;
-                          const revealWindow = 0.15;
-                          const rawReveal = (revealProgress - particleRevealStart) / revealWindow;
-                          const revealEase = rawReveal <= 0
-                            ? 0
-                            : rawReveal >= 1
-                              ? 1
-                              : 1 - Math.pow(1 - rawReveal, 3);
-
-                          const opacity = Math.min(1, motionProgress * 3) * revealEase * (1 - projectEase);
-
-                          const statusTarget = clusterTargets.get(p.globalIndex);
-                          const authorTarget = authorTargets.get(p.globalIndex);
-                          const baseTargetX = statusTarget ? statusTarget.x : domeX;
-                          const baseTargetY = statusTarget ? statusTarget.y : domeY;
-                          const blendedTargetX = authorTarget
-                            ? baseTargetX + (authorTarget.x - baseTargetX) * authorEase
-                            : baseTargetX;
-                          const blendedTargetY = authorTarget
-                            ? baseTargetY + (authorTarget.y - baseTargetY) * authorEase
-                            : baseTargetY;
-
-                          const destX = domeX + (blendedTargetX - domeX) * clusterEase;
-                          const destY = domeY + (blendedTargetY - domeY) * clusterEase;
-
-                          const curX = startX + (destX - startX) * ease;
-                          const curY = startY + (destY - startY) * ease;
-
-                          const clusterScaleTarget = 1;
-                          const clusterScaleProgress = clusterProgress > 0
-                            ? Math.min(1, 0.35 + clusterEase * 0.9)
-                            : 0;
-                          const morphScale = scaleDome + (clusterScaleTarget - scaleDome) * clusterScaleProgress;
-                          const curScale = morphScale * Math.min(1, swarmProgress * 1.2) * (0.4 + 0.6 * revealEase);
-
-                          const backgroundColor = "#000000";
-
-                          // Scale transition as well? 
-                          // Let's mix standard scale (0 -> 1) with 3D scale.
-                          // Actually, just apply final scale.
-
-                          return (
-                            <div key={i} style={{
-                              position: 'absolute',
-                              left: '50%',
-                              top: '50%',
-                              width: `${size}px`,
-                              height: `${size}px`,
-                              borderRadius: '50%',
-                              backgroundColor,
-                              opacity: opacity,
-                              zIndex: Math.floor((1 - normDist) * 100),
-                              transform: `translate(${curX}px, ${curY}px) scale(${curScale})`,
-                              boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
-                              willChange: 'transform, opacity'
-                            }} />
-                          );
-                        })}
-
-                        {projectParticles.map((p, i) => {
-                          if (i >= projectVisibleCount) return null;
-
-                          const seed = i * 392.11;
-                          const startAngle = (seed % (Math.PI * 2)) + i;
-                          const startR = 1200 + (seed % 600);
-                          const startX = Math.cos(startAngle) * startR;
-                          const startY = Math.sin(startAngle) * startR;
-
-                          const theta = i * 2.39996;
-                          const r = spread * Math.sqrt(i);
-
-                          const domeX = r * Math.cos(theta);
-                          const domeY = r * Math.sin(theta) + domeOffsetY; // Dome Centered
-
-                          const maxI = projectCount - 1;
-                          const normDist = maxI > 0 ? Math.sqrt(i / maxI) : 0;
-                          const sphereZ = maxI > 0 ? Math.sqrt(1 - normDist * normDist) : 1;
-
-                          const scaleDome = 0.6 + 0.6 * sphereZ;
-                          const ease = projectEase;
-
-                          const particleRevealStart = i / (projectCount || 1);
-                          const revealWindow = 0.15;
-                          const rawReveal = (projectRevealProgress - particleRevealStart) / revealWindow;
-                          const revealEase = rawReveal <= 0
-                            ? 0
-                            : rawReveal >= 1
-                              ? 1
-                              : 1 - Math.pow(1 - rawReveal, 3);
-
-                          // Apply Chaos
-                          // If falling, opacity goes down FAST
-                          const fallOpacity = Math.max(0, 1 - chaosProgress * 2);
-
-                          const opacity = Math.min(1, motionProgress * 3) * revealEase * projectEase * fallOpacity;
-
-                          const statusTarget = projectClusterTargets.get(p.projectIndex);
-                          const baseTargetX = statusTarget ? statusTarget.x : domeX;
-                          const baseTargetY = statusTarget ? statusTarget.y : domeY;
-
-                          const destX = domeX + (baseTargetX - domeX) * projectEase;
-                          const destY = domeY + (baseTargetY - domeY) * projectEase;
-
-                          const curX = startX + (destX - startX) * ease;
-                          const curY = startY + (destY - startY) * ease;
-
-                          const clusterScaleTarget = 1;
-                          const clusterScaleProgress = projectProgress > 0
-                            ? Math.min(1, 0.35 + projectEase * 0.9)
-                            : 0;
-                          const morphScale = scaleDome + (clusterScaleTarget - scaleDome) * clusterScaleProgress;
-
-                          // Determine chaotic fall values
-                          // Random fall distance (mostly down, slight spread)
-                          const fallDistance = 800 + (seed % 600);
-                          const fallX = (Math.cos(seed) * 200) * chaosEase; // Slight drift X
-                          const fallY = fallDistance * chaosEase; // Big drop Y
-
-                          const curScale = morphScale * Math.min(1, swarmProgress * 1.2) * (0.4 + 0.6 * revealEase);
-
-                          const backgroundColor = "#000000";
-
-                          return (
-                            <div key={`proyecto-${i}`} style={{
-                              position: 'absolute',
-                              left: '50%',
-                              top: '50%',
-                              width: `${size}px`,
-                              height: `${size}px`,
-                              borderRadius: '50%',
-                              backgroundColor,
-                              opacity: opacity,
-                              zIndex: Math.floor((1 - normDist) * 100),
-                              transform: `translate(${curX + fallX}px, ${curY + fallY}px) scale(${curScale})`,
-                              boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
-                              willChange: 'transform, opacity'
-                            }} />
-                          );
-                        })}
-
-                        {[{ labels: clusterLabels, mix: (1 - authorEase) * (1 - projectEase) }, { labels: authorLabels, mix: authorEase * (1 - projectEase) }, { labels: projectClusterLabels, mix: projectEase * (1 - chaosEase) }]
-                          .map(({ labels, mix }) => labels.map((label) => {
-                            const labelOpacity = clusterProgress <= 0
-                              ? 0
-                              : Math.min(1, clusterEase * 1.4) * mix;
-
-                            if (labelOpacity <= 0.01) return null;
-
-                            return (
-                              <div
-                                key={label.key + mix}
-                                style={{
-                                  position: 'absolute',
-                                  left: '50%',
-                                  top: '50%',
-                                  transform: `translate(${label.x}px, ${label.y}px) translate(-50%, -100%)`,
-                                  color: '#000',
-                                  fontWeight: 700,
-                                  textAlign: 'center',
-                                  whiteSpace: 'nowrap',
-                                  opacity: labelOpacity * (1 - chaosEase),
-                                  textShadow: '0 1px 2px rgba(255,255,255,0.9)',
-                                  pointerEvents: 'none'
-                                }}
-                              >
-                                {label.label}
-                              </div>
-                            );
-                          }))}
-                      </div>
-                    );
-                  })()}
                 </div>
               </div>
             );
           })()}
+
+          {/* LEGISLATIVE SWARM (CIRCLES) */}
+          <LegislativeSwarm
+            scrollY={scrollY}
+            nodes={swarmData.nodes}
+            categories={swarmData.categories}
+            width={size.width}
+            height={size.height}
+            isMobile={isMobile}
+            onOpenDatabase={() => setView('database')}
+          />
+
+          {/* ABSTENTION SECTION */}
+          <AbstentionSection
+            scrollY={scrollY}
+            leaders={abstentionLeaders}
+            isMobile={isMobile}
+            onNavigate={(v) => setView(v)}
+          />
+        </div>
+      </div>
+    </div >
+  );
+}
+
+// ==========================================
+// SUB-COMPONENT: LegislativeSwarm
+// ==========================================
+function LegislativeSwarm({ scrollY, nodes, categories, width, height, isMobile, onOpenDatabase }) {
+  // 1. CONFIGURATION
+  const SECTION_START = 31500;
+  const SECTION_TRANSITION = 4000;
+  const SECTION_END = 38000; // REDUCED from 45000 to shorten scroll
+
+  const [selectedNode, setSelectedNode] = useState(null);
+
+  const rawP = (scrollY - SECTION_START) / SECTION_TRANSITION;
+  const progress = Math.min(1, Math.max(0, rawP));
+
+  // Only render if we are near the section
+  if (scrollY < SECTION_START - 2000) return null;
+
+
+
+  // JSX RETURN
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0, left: 0,
+      width: '100%', height: '100%',
+      pointerEvents: 'none',
+      zIndex: 60,
+      opacity: Math.min(1, (scrollY - SECTION_START + 500) / 500, Math.max(0, (SECTION_END - 1000 - scrollY) / 1000)) // Fade in, then fade out before END
+    }}>
+      {/* 0. TITLE */}
+      <div style={{
+        position: 'absolute',
+        top: '8%',
+        width: '100%',
+        textAlign: 'center',
+        opacity: Math.max(0, (progress - 0.2) * 2),
+        transition: 'opacity 0.3s ease'
+      }}>
+        <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: isMobile ? '24px' : '32px', fontWeight: 700, color: '#111', margin: 0 }}>
+          Resultados de iniciativas legislativas
+        </h2>
+      </div>
+
+      {/* 1. Cluster Labels */}
+      <div style={{
+        position: 'absolute',
+        top: '15%',
+        width: '100%',
+        display: 'flex',
+        justifyContent: 'space-around',
+        opacity: Math.max(0, (progress - 0.5) * 2),
+        transition: 'opacity 0.3s ease'
+      }}>
+        {categories.map(cat => {
+          const count = nodes.filter(n => n.status === cat).length;
+          return (
+            <div key={cat} style={{ textAlign: 'center', width: `${100 / categories.length}%` }}>
+              <div style={{ fontFamily: 'var(--font-serif)', fontWeight: 700, fontSize: isMobile ? '12px' : '16px', color: '#111', marginBottom: '4px' }}>{cat}</div>
+              <div style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: isMobile ? '16px' : '24px', color: '#555' }}>{count}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 2. SVG */}
+      <svg width={width} height={height} style={{ pointerEvents: 'none' }}>
+        {nodes.map((node) => {
+          const x = node.cloudX + (node.clusterX - node.cloudX) * progress;
+          const y = node.cloudY + (node.clusterY - node.cloudY) * progress;
+          const isSelected = selectedNode && selectedNode.id === node.id;
+          return (
+            <circle
+              key={node.id}
+              cx={x} cy={y}
+              r={isSelected ? (node.r * 2.5) : node.r}
+              fill={node.color}
+              stroke="white"
+              strokeWidth={isSelected ? 2 : 0.5}
+              style={{ pointerEvents: 'auto', cursor: 'pointer', transition: 'r 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), stroke-width 0.2s', opacity: 0.9 }}
+              onClick={() => setSelectedNode(isSelected ? null : node)}
+            />
+          );
+        })}
+      </svg>
+
+      {/* 4. Detail Card */}
+      {selectedNode && (
+        <div className="deputy-card" style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0,
+          backgroundColor: 'white', padding: '32px 24px 48px',
+          borderTopLeftRadius: '24px', borderTopRightRadius: '24px',
+          boxShadow: '0 -4px 30px rgba(0, 0, 0, 0.15)', zIndex: 100,
+          maxWidth: '1000px', margin: '0 auto', textAlign: 'center',
+          borderTop: '1px solid #e5e7eb', animation: 'slide-up 0.3s ease-out',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', pointerEvents: 'auto'
+        }}>
+          <button onClick={() => setSelectedNode(null)} style={{ position: 'absolute', top: '20px', right: '20px', background: '#f3f4f6', border: 'none', borderRadius: '50%', width: '36px', height: '36px', fontSize: '18px', cursor: 'pointer', color: '#374151', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}>✕</button>
+
+          <div style={{ backgroundColor: selectedNode.color, color: 'white', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.05em' }}>
+            {selectedNode.status}
+          </div>
+
+          <h3 style={{ margin: '0', fontFamily: 'var(--font-serif)', fontSize: isMobile ? '18px' : '22px', lineHeight: 1.3, color: '#111', maxWidth: '90%' }}>
+            {selectedNode.titulo}
+          </h3>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '12px', color: '#666', fontSize: '13px', marginTop: '4px' }}>
+            {selectedNode.data.fecha_presentacion && <span>• <strong>Presentada:</strong> {new Date(selectedNode.data.fecha_presentacion).toLocaleDateString()}</span>}
+            {selectedNode.data.autor && <span>• <strong>Autor:</strong> {selectedNode.data.autor}</span>}
+          </div>
+
+          {(selectedNode.voteData || selectedNode.resultOverride || selectedNode.customNote) && (
+            <div style={{ marginTop: '24px', width: '100%', paddingTop: '16px', borderTop: '1px solid #f3f4f6' }}>
+              <h4 style={{ fontSize: '12px', margin: '0 0 12px', color: '#6b7280', fontFamily: 'var(--font-sans)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Resultado de la votación</h4>
+
+              {selectedNode.resultOverride ? (
+                <div style={{ fontFamily: 'var(--font-serif)', fontSize: isMobile ? '16px' : '18px', color: '#111', lineHeight: 1.4, maxWidth: '80%', margin: '0 auto', padding: '12px', backgroundColor: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                  {selectedNode.resultOverride}
+                </div>
+              ) : selectedNode.voteData ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: isMobile ? '4px' : '8px' }}>
+                  {[
+                    { l: 'A favor', c: selectedNode.voteData.si, bg: '#dcfce7', txt: '#166534' },
+                    { l: 'En contra', c: selectedNode.voteData.no, bg: '#fee2e2', txt: '#991b1b' },
+                    { l: 'Abstención', c: selectedNode.voteData.abs, bg: '#fef9c3', txt: '#854d0e' },
+                    { l: 'No votan', c: selectedNode.voteData.nv, bg: '#f3f4f6', txt: '#374151' }
+                  ].map(item => (
+                    <div key={item.l} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', backgroundColor: item.bg, borderRadius: '8px', padding: '8px 4px' }}>
+                      <span style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: 700, color: item.txt, fontFamily: 'var(--font-serif)' }}>{item.c}</span>
+                      <span style={{ fontSize: isMobile ? '10px' : '11px', color: item.txt, fontWeight: 500, opacity: 0.8, textAlign: 'center', lineHeight: 1.2 }}>{item.l}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {selectedNode.customNote && (
+                <div style={{ marginTop: '16px', fontFamily: 'var(--font-sans)', fontSize: isMobile ? '12px' : '14px', color: '#555', backgroundColor: '#f9fafb', padding: '12px', borderRadius: '8px', maxWidth: '90%', margin: '16px auto 0', border: '1px solid #e5e7eb' }}>
+                  {selectedNode.customNote}
+                </div>
+              )}
+            </div>
+          )}
+
+
+        </div>
+      )}
+
+      {/* Button Link */}
+      <div style={{
+        position: 'absolute', bottom: '100px', width: '100%', textAlign: 'center',
+        opacity: selectedNode ? 0 : Math.max(0, (progress - 0.8) * 5),
+        pointerEvents: (progress > 0.9 && !selectedNode) ? 'auto' : 'none',
+        zIndex: 200
+      }}>
+        <p style={{
+          fontFamily: 'var(--font-sans)',
+          fontSize: isMobile ? '14px' : '16px',
+          color: '#333',
+          marginBottom: '16px',
+          marginTop: 0,
+          fontWeight: 500,
+          textShadow: '0 1px 2px rgba(255,255,255,0.8)'
+        }}>
+          Esto es solo una parte del año legislativo. Si quieres ver el pleno completo:
+        </p>
+        <button
+          onClick={onOpenDatabase}
+          style={{ background: '#111', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '30px', fontSize: '16px', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+          Accede a todas las votaciones en el Pleno
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
+// ==========================================
+// SUB-COMPONENT: AbstentionSection
+// ==========================================
+
+function AbstentionSection({ scrollY, leaders, isMobile, onNavigate }) {
+  const START = 36000; // Reduced from 40000
+  const FADE_OUT_START = 39000; // Reduced from 43000
+  const FINAL_START = 40000; // Reduced from 44000
+  const STAGGER_STEP = 600;
+
+  const [showCredits, setShowCredits] = useState(false);
+
+  // 3. Final Section Opacity
+  const finalOpacity = Math.min(1, Math.max(0, (scrollY - FINAL_START) / 800));
+
+  // Trigger credits
+  useEffect(() => {
+    if (finalOpacity > 0.9) {
+      const timer = setTimeout(() => setShowCredits(true), 1500);
+      return () => clearTimeout(timer);
+    } else {
+      setShowCredits(false);
+    }
+  }, [finalOpacity]);
+
+  if (scrollY < START - 1000) return null;
+
+  // 1. Base Opacity (Entrance)
+  const opEntry = Math.min(1, Math.max(0, (scrollY - START) / 500));
+
+  // 2. Abstention Exit
+  const opExit = 1 - Math.min(1, Math.max(0, (scrollY - FADE_OUT_START) / 1000));
+
+  // Combined Opacity for Abstention Block
+  const abstentionGlobalOpacity = opEntry * opExit;
+
+  // Staggering for Abstention items
+  const opJunts = Math.min(1, Math.max(0, (scrollY - START) / 600));
+  const opSanchezVotes = Math.min(1, Math.max(0, (scrollY - (START + STAGGER_STEP)) / 600));
+  const opSanchezTalks = Math.min(1, Math.max(0, (scrollY - (START + STAGGER_STEP * 2)) / 600));
+
+  if (!leaders || leaders.length === 0) return null;
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0, left: 0,
+      width: '100%', height: '100%',
+      // We use flex to align generally, but children manage their own layout/visibility
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      pointerEvents: 'none',
+      zIndex: 55,
+      // Background: White, masking underlying content
+      backgroundColor: `rgba(255,255,255,${0.95 * Math.max(abstentionGlobalOpacity, finalOpacity)})`
+    }}>
+      {/* ABSTENTION CONTENT */}
+      <div style={{
+        display: abstentionGlobalOpacity > 0 ? 'flex' : 'none',
+        opacity: abstentionGlobalOpacity,
+        justifyContent: 'center', gap: isMobile ? '16px' : '64px', maxWidth: '1200px', width: '100%', padding: isMobile ? '0 8px' : '0 40px', flexWrap: 'wrap', alignItems: 'flex-start'
+      }}>
+        {/* Column 1: Junts */}
+        <div style={{
+          flex: '1 1 400px',
+          textAlign: 'center',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          opacity: opJunts,
+          transition: 'opacity 0.3s ease-out'
+        }}>
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: isMobile ? '24px' : '36px', fontWeight: 700, color: '#111', marginBottom: isMobile ? '8px' : '24px' }}>
+            Junts se abstiene
+          </h2>
+
+          <div style={{ marginBottom: '0px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <img
+              src="/images/abstencion.png"
+              alt="Abstención"
+              style={{ maxWidth: '100%', maxHeight: isMobile ? '200px' : '550px', width: 'auto', height: 'auto' }}
+            />
+          </div>
+
+          <p style={{ fontFamily: 'var(--font-sans)', fontSize: isMobile ? '14px' : '18px', color: '#333', lineHeight: '1.4', marginTop: isMobile ? '-24px' : '-20px' }}>
+            Con <strong>122 abstenciones</strong> cada uno, <strong>Josep Maria Cervera Pinart, Marta Marenas i Mir</strong> y <strong>Josep Pagès i Massó</strong> fueron los diputados que más veces se abstuvieron en 2025. <strong>Los tres pertenecen al Grupo Parlamentario Junts per Catalunya</strong>.
+          </p>
         </div>
 
-        <div style={{ height: '42000px', width: '1px', flexShrink: 0 }} />
+        {/* Column 2: Pedro Sánchez */}
+        <div style={{
+          flex: '1 1 500px',
+          opacity: opSanchezVotes,
+          transition: 'opacity 0.3s ease-out'
+        }}>
+
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '8px' : '32px', alignItems: 'center', textAlign: isMobile ? 'center' : 'left' }}>
+            {/* Image on the left */}
+            <div style={{ flex: '0 0 auto' }}>
+              <img
+                src="/images/pedro_sanchez.png"
+                alt="Pedro Sánchez"
+                style={{ maxWidth: isMobile ? '120px' : '250px', height: 'auto', display: 'block' }}
+              />
+            </div>
+
+            {/* Texts on the right */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: isMobile ? '16px' : '32px' }}>
+
+              {/* Block 1: Votes */}
+              <div>
+                <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: isMobile ? '22px' : '32px', fontWeight: 700, color: '#111', marginBottom: isMobile ? '4px' : '16px', marginTop: 0 }}>
+                  El escaño más ocupado
+                </h2>
+                <p style={{ fontFamily: 'var(--font-sans)', fontSize: isMobile ? '14px' : '18px', color: '#333', lineHeight: '1.4', margin: 0 }}>
+                  <strong>Pedro Sánchez Pérez-Castejón</strong>, presidente del Gobierno, <strong>no votó en 429</strong> de las <strong>más de 700 votaciones</strong> celebradas en 2025 en el Pleno del Congreso de los Diputados.
+                </p>
+              </div>
+
+              {/* Block 2: Interventions */}
+              <div style={{ opacity: opSanchezTalks, transition: 'opacity 0.3s ease-out' }}>
+                <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: isMobile ? '22px' : '32px', fontWeight: 700, color: '#111', marginBottom: isMobile ? '4px' : '16px', marginTop: 0 }}>
+                  Pero el que más habló
+                </h2>
+                <p style={{ fontFamily: 'var(--font-sans)', fontSize: isMobile ? '14px' : '18px', color: '#333', lineHeight: '1.4', margin: 0 }}>
+                  Aún así, su presencia se dejó oír: <strong>intervino 123 veces</strong> en los plenos, con un total de <strong>40 horas y 49 minutos</strong> de palabra.
+                </p>
+              </div>
+
+            </div>
+          </div>
+
+          <div style={{ marginTop: isMobile ? '24px' : '80px', textAlign: 'center', opacity: opSanchezTalks, transition: 'opacity 0.3s ease-out' }}>
+            <button onClick={() => {
+              onNavigate('deputies');
+            }} style={{
+              background: '#111',
+              color: '#fff',
+              border: 'none',
+              padding: '12px 24px',
+              borderRadius: '30px',
+              fontSize: '16px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+              pointerEvents: 'auto'
+            }}>
+              Accede a los datos de los diputados
+            </button>
+          </div>
+
+        </div>
       </div>
+
+      {/* FINAL SECTION */}
+      <div style={{
+        display: finalOpacity > 0 ? 'flex' : 'none',
+        opacity: finalOpacity,
+        position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+        flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '48px',
+        pointerEvents: finalOpacity > 0.5 ? 'auto' : 'none'
+      }}>
+        <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '56px', fontWeight: 700, color: '#111', marginBottom: '16px', textAlign: 'center' }}>
+          Dentro del Pleno
+        </h1>
+
+        <div style={{ display: 'flex', gap: isMobile ? '16px' : '24px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <button onClick={() => {
+            if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
+            window.location.reload();
+          }}
+            style={{
+              background: 'transparent',
+              border: '1px solid #333',
+              borderRadius: '30px',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
+              fontSize: isMobile ? '16px' : '18px',
+              color: '#333',
+              padding: '12px 24px',
+              fontWeight: 500,
+              transition: 'all 0.2s',
+              zIndex: 100
+            }}
+            onMouseEnter={(e) => { e.target.style.background = '#111'; e.target.style.color = '#fff'; }}
+            onMouseLeave={(e) => { e.target.style.background = 'transparent'; e.target.style.color = '#333'; }}
+          >
+            Volver al inicio
+          </button>
+
+          <button
+            onClick={() => onNavigate('deputies')}
+            style={{
+              background: '#111',
+              border: 'none',
+              borderRadius: '30px',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
+              fontSize: isMobile ? '16px' : '18px',
+              color: '#fff',
+              padding: '12px 24px',
+              fontWeight: 600,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              transition: 'transform 0.2s',
+              zIndex: 100
+            }}
+            onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
+            onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+          >
+            Diputados
+          </button>
+
+          <button
+            onClick={() => onNavigate('database')}
+            style={{
+              background: '#111',
+              border: 'none',
+              borderRadius: '30px',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
+              fontSize: isMobile ? '16px' : '18px',
+              color: '#fff',
+              padding: '12px 24px',
+              fontWeight: 600,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              transition: 'transform 0.2s',
+              zIndex: 100
+            }}
+            onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
+            onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+          >
+            Votaciones de leyes e iniciativas
+          </button>
+        </div>
+
+        <div style={{
+          marginTop: isMobile ? '120px' : '64px',
+          marginBottom: '32px',
+          opacity: showCredits ? 1 : 0,
+          transition: 'opacity 1s ease-in-out',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '16px'
+        }}>
+          <span style={{ fontFamily: 'var(--font-sans)', fontSize: isMobile ? '14px' : '16px', fontWeight: 600, color: '#333' }}>
+            J. Diego Tejera Sosa
+          </span>
+
+          <div style={{ display: 'flex', gap: '24px', marginTop: '0px' }}>
+            <a href="https://www.linkedin.com/in/juandiegotejerasosa/" target="_blank" rel="noopener noreferrer"
+              className="shiny-icon"
+              style={{ color: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '48px', height: '48px' }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
+              </svg>
+            </a>
+            <a href="mailto:jdiegotejeras@gmail.com"
+              className="shiny-icon"
+              style={{ color: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '48px', height: '48px' }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                <polyline points="22,6 12,13 2,6"></polyline>
+              </svg>
+            </a>
+          </div>
+
+          <p style={{ fontFamily: 'var(--font-sans)', fontSize: '12px', color: '#999', margin: '24px 0 0', textAlign: 'center', maxWidth: '300px', lineHeight: 1.5 }}>
+            Datos obtenidos del <a href="https://www.congreso.es/es/datos-abiertos" target="_blank" rel="noopener noreferrer" style={{ color: '#999', textDecoration: 'underline' }}>Portal de Datos Abiertos</a> de la web del <a href="https://www.congreso.es/es/home" target="_blank" rel="noopener noreferrer" style={{ color: '#999', textDecoration: 'underline' }}>Congreso de los Diputados</a>.
+          </p>
+        </div>
+      </div>
+
     </div>
   );
 }
