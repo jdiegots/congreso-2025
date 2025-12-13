@@ -1008,22 +1008,10 @@ export default function App() {
     setSearchResults(results);
   }, [searchTerm, interventionsMap, isMobile]);
 
+
   useEffect(() => {
-    d3.csv("/data/out_votaciones/votos.csv").then(rows => {
-      const map = {};
-      rows.forEach(r => {
-        const did = r.diputado_id;
-        if (!did) return;
-        const key = String(did);
-
-        if (!map[key]) map[key] = { si: 0, no: 0, abs: 0, nv: 0 };
-
-        const v = (r.voto || "").toLowerCase().trim();
-        if (v === 'sí' || v === 'si') map[key].si++;
-        else if (v === 'no') map[key].no++;
-        else if (v === 'abstención' || v === 'abstencion') map[key].abs++;
-        else map[key].nv++;
-      });
+    // Optimization: Load pre-calculated stats instead of parsing raw CSV
+    d3.json("/data/out_votaciones/stats_diputados.json").then(map => {
       setVotesByDeputy(map);
 
       // Calculate Abstention Leaders
@@ -1048,7 +1036,7 @@ export default function App() {
       } else {
         setAbstentionLeaders([]);
       }
-    }).catch(e => console.error("Could not load votes:", e));
+    }).catch(e => console.error("Could not load stats:", e));
 
 
 
@@ -2082,7 +2070,7 @@ export default function App() {
                     animationDelay: `${i * 1.1}s` // Desynced
                   }}>
                     <img
-                      src={`images/${d.imagen}`}
+                      src={d.imagen.includes('.') ? `images/${d.imagen}` : `images/${d.imagen}.png`}
                       alt={d.nombre}
                       onMouseEnter={() => setHoveredDeputyIndex(i)}
                       onMouseLeave={() => setHoveredDeputyIndex(null)}
@@ -2421,7 +2409,7 @@ export default function App() {
           />
         </div>
       </div>
-    </div >
+    </div>
   );
 }
 
@@ -2464,7 +2452,7 @@ function LegislativeSwarm({ scrollY, nodes, categories, width, height, isMobile,
         transition: 'opacity 0.3s ease'
       }}>
         <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: isMobile ? '24px' : '32px', fontWeight: 700, color: '#111', margin: 0 }}>
-          Resultados de iniciativas legislativas
+          Cómo terminaron (o siguen) las iniciativas legislativas de 2025
         </h2>
       </div>
 

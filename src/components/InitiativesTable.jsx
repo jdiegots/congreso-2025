@@ -30,16 +30,33 @@ export default function InitiativesTable({ onBack }) {
         // Load votes if not loaded
         if (!votesMap && !votesLoading) {
             setVotesLoading(true);
-            d3.csv("/data/out_votaciones/votos.csv").then(data => {
-                const map = {};
-                data.forEach(v => {
-                    const uid = v.votacion_uid;
-                    if (!map[uid]) map[uid] = [];
-                    map[uid].push(v);
+
+            // 1. Fetch Summary to get chunks
+            fetch("/data/out_votaciones/summary.json")
+                .then(res => res.json())
+                .then(summary => {
+                    const chunkFiles = summary.votos_chunks || [];
+                    const promises = chunkFiles.map(f => d3.csv(`/data/out_votaciones/${f}`));
+
+                    Promise.all(promises).then(results => {
+                        const map = {};
+                        // Process all chunks
+                        results.forEach(chunkData => {
+                            chunkData.forEach(v => {
+                                // Use integer ID
+                                const uid = v.votacion_id;
+                                if (!map[uid]) map[uid] = [];
+                                map[uid].push(v);
+                            });
+                        });
+                        setVotesMap(map);
+                        setVotesLoading(false);
+                    });
+                })
+                .catch(err => {
+                    console.error("Error loading votes summary:", err);
+                    setVotesLoading(false);
                 });
-                setVotesMap(map);
-                setVotesLoading(false);
-            });
         }
     };
 
@@ -59,7 +76,9 @@ export default function InitiativesTable({ onBack }) {
     // Helper to get votes for the modal
     const getCurrentVotes = () => {
         if (!selectedInitiative || !votesMap) return { si: [], no: [], abs: [], noVota: [] };
-        const votes = votesMap[selectedInitiative.votacion_uid] || [];
+
+        // Use 'id' (which corresponds to votacion_id)
+        const votes = votesMap[selectedInitiative.id] || [];
 
         const normalize = (v) => (v || "").toLowerCase().trim();
         const searchTerm = modalSearch.toLowerCase().trim();
@@ -141,7 +160,8 @@ export default function InitiativesTable({ onBack }) {
                     abstenciones,
                     total,
                     result: a_favor > en_contra ? 'Aprobada' : 'Rechazada', // Simple logic, can be refined
-                    id: d.iniciativa_id || d.votacion_uid
+                    // Use new Integer ID as the primary ID
+                    id: d.id
                 };
             });
             setData(processed);

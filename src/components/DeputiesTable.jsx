@@ -76,11 +76,12 @@ export default function DeputiesTable({ onBack }) {
 
         const loadData = async () => {
             try {
-                // 1. Cargar metadatos de votaciones para tener títulos y detalles
+                // 1. Cargar metadatos de votaciones
                 const votaciones = await d3.csv('/data/out_votaciones/votaciones.csv');
                 const metaMap = {};
                 votaciones.forEach(v => {
-                    metaMap[v.votacion_uid] = {
+                    // Use 'id' column to match with votacion_id in votes CSV
+                    metaMap[v.id] = {
                         titulo: v.titulo_punto || "Votación sin título",
                         texto: v.texto_expediente,
                         fecha: v.fecha,
@@ -94,12 +95,23 @@ export default function DeputiesTable({ onBack }) {
                 });
                 console.log(`Metadatos cargados: ${Object.keys(metaMap).length} votaciones.`);
 
-                // 2. Cargar votos individuales
-                const votos = await d3.csv("/data/out_votaciones/votos.csv");
+                // 2. Cargar votos individuales (chunks)
+                const summaryRes = await fetch("/data/out_votaciones/summary.json");
+                if (!summaryRes.ok) throw new Error("No se pudo cargar summary.json");
+                const summary = await summaryRes.json();
+                const chunkFiles = summary.votos_chunks || [];
+
+                console.log(`Cargando ${chunkFiles.length} chunks de votos...`);
+
+                const chunks = await Promise.all(
+                    chunkFiles.map(f => d3.csv(`/data/out_votaciones/${f}`))
+                );
+
+                const votos = chunks.flat();
 
                 if (!isMounted) return;
 
-                console.log("Votos cargados:", votos.length);
+                console.log("Total de votos cargados:", votos.length);
                 const map = {};
 
                 if (votos.length === 0) {
@@ -107,39 +119,42 @@ export default function DeputiesTable({ onBack }) {
                     return;
                 }
 
-                // Detectar nombre de columna de diputado
+                // Detectar nombres de columna
                 const keys = Object.keys(votos[0]);
-                const deputyKey = keys.find(k => k === 'diputado_xml') ||
-                    keys.find(k => k.trim().toLowerCase() === 'diputado') ||
-                    keys.find(k => k.toLowerCase().includes('diputado') && !k.includes('id') && !k.includes('status')) ||
-                    'diputado';
-
+                const idKey = keys.find(k => k === 'diputado_id');
+                const deputyKey = keys.find(k => k === 'diputado_xml') || 'diputado';
                 const voteKey = keys.find(k => k.trim().toLowerCase() === 'voto') || 'voto';
 
-                console.log(`Usando columnas: Diputado=[${deputyKey}], Voto=[${voteKey}]`);
-
                 votos.forEach(row => {
-                    const rawName = row[deputyKey];
-                    if (!rawName) return;
-
-                    const name = normalizeStr(rawName);
-                    if (!map[name]) map[name] = [];
-
-                    const uid = row.votacion_uid;
+                    const uid = row.votacion_uid || row.votacion_id;
                     const meta = metaMap[uid] || {};
 
-                    map[name].push({
+                    const voteItem = {
                         titulo: meta.titulo || "Votación",
-                        texto: meta.texto, // Descripción detallada
+                        texto: meta.texto,
                         fecha: meta.fecha,
                         sesion: meta.sesion,
                         resultado_global: meta.resultado,
                         voto: row[voteKey],
                         id: uid
-                    });
+                    };
+
+                    // Map by ID
+                    if (idKey && row[idKey]) {
+                        const id = String(row[idKey]);
+                        if (!map[id]) map[id] = [];
+                        map[id].push(voteItem);
+                    }
+
+                    // Map by name (fallback/support)
+                    const rawName = row[deputyKey];
+                    if (rawName) {
+                        const name = normalizeStr(rawName);
+                        if (!map[name]) map[name] = [];
+                        map[name].push(voteItem);
+                    }
                 });
 
-                console.log("Mapa de votos creado, diputados encontrados:", Object.keys(map).length);
                 setVotesData(map);
             } catch (err) {
                 console.error("Error loading votes:", err);
@@ -709,76 +724,84 @@ export default function DeputiesTable({ onBack }) {
                                         </div>
                                     ) : (
                                         <div style={{ maxHeight: '400px', overflowY: 'auto', paddingRight: '8px' }}>
-                                            {(votesData[normalizeStr(selectedDeputy.nombre)] && votesData[normalizeStr(selectedDeputy.nombre)].length > 0) ? (
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                    {votesData[normalizeStr(selectedDeputy.nombre)].map((v, idx) => (
-                                                        <div key={idx} style={{
-                                                            padding: '16px',
-                                                            background: '#f9fafb',
-                                                            borderRadius: '12px',
-                                                            display: 'flex',
-                                                            flexDirection: 'column',
-                                                            gap: '8px',
-                                                            fontSize: '14px',
-                                                            border: '1px solid #f3f4f6'
-                                                        }}>
-                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
-                                                                <span style={{ color: '#111', fontWeight: 600, flex: 1, fontSize: '15px', lineHeight: '1.4' }}>
-                                                                    {v.titulo}
-                                                                </span>
-                                                                <span style={{
-                                                                    fontWeight: 700,
-                                                                    fontSize: '13px',
-                                                                    color: v.voto === 'Sí' ? '#15803d' : (v.voto === 'No' ? '#b91c1c' : '#a16207'),
-                                                                    padding: '4px 10px',
-                                                                    background: v.voto === 'Sí' ? '#dcfce7' : (v.voto === 'No' ? '#fee2e2' : '#fef9c3'),
-                                                                    borderRadius: '6px',
-                                                                    textAlign: 'center',
-                                                                    whiteSpace: 'nowrap',
-                                                                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                                                                }}>
-                                                                    {v.voto}
-                                                                </span>
-                                                            </div>
+                                            {(() => {
+                                                const history = votesData[String(selectedDeputy.id)] || votesData[normalizeStr(selectedDeputy.nombre)];
 
-                                                            {v.texto && (
-                                                                <div style={{
-                                                                    fontSize: '13px',
-                                                                    color: '#4b5563',
-                                                                    lineHeight: 1.5,
-                                                                    display: '-webkit-box',
-                                                                    WebkitLineClamp: 3,
-                                                                    WebkitBoxOrient: 'vertical',
-                                                                    overflow: 'hidden'
+                                                if (history && history.length > 0) {
+                                                    return (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                            {history.map((v, idx) => (
+                                                                <div key={idx} style={{
+                                                                    padding: '16px',
+                                                                    background: '#f9fafb',
+                                                                    borderRadius: '12px',
+                                                                    display: 'flex',
+                                                                    flexDirection: 'column',
+                                                                    gap: '8px',
+                                                                    fontSize: '14px',
+                                                                    border: '1px solid #f3f4f6'
                                                                 }}>
-                                                                    {v.texto}
-                                                                </div>
-                                                            )}
+                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                                                                        <span style={{ color: '#111', fontWeight: 600, flex: 1, fontSize: '15px', lineHeight: '1.4' }}>
+                                                                            {v.titulo}
+                                                                        </span>
+                                                                        <span style={{
+                                                                            fontWeight: 700,
+                                                                            fontSize: '13px',
+                                                                            color: v.voto === 'Sí' ? '#15803d' : (v.voto === 'No' ? '#b91c1c' : '#a16207'),
+                                                                            padding: '4px 10px',
+                                                                            background: v.voto === 'Sí' ? '#dcfce7' : (v.voto === 'No' ? '#fee2e2' : '#fef9c3'),
+                                                                            borderRadius: '6px',
+                                                                            textAlign: 'center',
+                                                                            whiteSpace: 'nowrap',
+                                                                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                                                        }}>
+                                                                            {v.voto}
+                                                                        </span>
+                                                                    </div>
 
-                                                            {v.resultado_global && (
-                                                                <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e5e7eb' }}>
-                                                                    <div style={{ marginBottom: '6px' }}>
-                                                                        <VoteBar
-                                                                            aFavor={v.resultado_global.a_favor}
-                                                                            enContra={v.resultado_global.en_contra}
-                                                                            abst={v.resultado_global.abstenciones}
-                                                                        />
-                                                                    </div>
-                                                                    <div style={{ display: 'flex', gap: 12, fontSize: '11px', fontWeight: 600 }}>
-                                                                        <span style={{ color: '#16a34a' }}>Sí: {v.resultado_global.a_favor}</span>
-                                                                        <span style={{ color: '#dc2626' }}>No: {v.resultado_global.en_contra}</span>
-                                                                        <span style={{ color: '#9ca3af' }}>Abs: {v.resultado_global.abstenciones}</span>
-                                                                    </div>
+                                                                    {v.texto && (
+                                                                        <div style={{
+                                                                            fontSize: '13px',
+                                                                            color: '#4b5563',
+                                                                            lineHeight: 1.5,
+                                                                            display: '-webkit-box',
+                                                                            WebkitLineClamp: 3,
+                                                                            WebkitBoxOrient: 'vertical',
+                                                                            overflow: 'hidden'
+                                                                        }}>
+                                                                            {v.texto}
+                                                                        </div>
+                                                                    )}
+
+                                                                    {v.resultado_global && (
+                                                                        <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e5e7eb' }}>
+                                                                            <div style={{ marginBottom: '6px' }}>
+                                                                                <VoteBar
+                                                                                    aFavor={v.resultado_global.a_favor}
+                                                                                    enContra={v.resultado_global.en_contra}
+                                                                                    abst={v.resultado_global.abstenciones}
+                                                                                />
+                                                                            </div>
+                                                                            <div style={{ display: 'flex', gap: 12, fontSize: '11px', fontWeight: 600 }}>
+                                                                                <span style={{ color: '#16a34a' }}>Sí: {v.resultado_global.a_favor}</span>
+                                                                                <span style={{ color: '#dc2626' }}>No: {v.resultado_global.en_contra}</span>
+                                                                                <span style={{ color: '#9ca3af' }}>Abs: {v.resultado_global.abstenciones}</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
-                                                            )}
+                                                            ))}
                                                         </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <div style={{ padding: '20px', textAlign: 'center', color: '#9ca3af', fontStyle: 'italic' }}>
-                                                    No hay datos de votación disponibles para este diputado.
-                                                </div>
-                                            )}
+                                                    );
+                                                } else {
+                                                    return (
+                                                        <div style={{ padding: '20px', textAlign: 'center', color: '#9ca3af', fontStyle: 'italic' }}>
+                                                            No hay datos de votación disponibles para este diputado.
+                                                        </div>
+                                                    );
+                                                }
+                                            })()}
                                         </div>
                                     )}
                                 </div>

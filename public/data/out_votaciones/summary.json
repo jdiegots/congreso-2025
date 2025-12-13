@@ -1,12 +1,19 @@
 {
   "votaciones_csv": "C:\\dev\\congreso-2025\\public\\data\\out_votaciones\\votaciones.csv",
-  "votos_csv": "C:\\dev\\congreso-2025\\public\\data\\out_votaciones\\votos.csv",
+  "votos_chunks": [
+    "votos_0.csv",
+    "votos_1.csv",
+    "votos_2.csv",
+    "votos_3.csv",
+    "votos_4.csv",
+    "votos_5.csv"
+  ],
   "reports_dir": "C:\\dev\\congreso-2025\\public\\data\\out_votaciones\\reports",
   "votaciones": 741,
   "votos": 258998,
   "unmatched_diputados_distintos": 1,
   "ambiguous_diputados_distintos": 0,
-  "unmatched_iniciativas_distintas": 205,
-  "ambiguous_iniciativas_distintas": 5,
+  "unmatched_iniciativas_distintas": 207,
+  "ambiguous_iniciativas_distintas": 8,
   "parse_errors": 0
 }

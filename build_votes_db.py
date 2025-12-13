@@ -153,7 +153,7 @@ def parse_date_ddmmyyyy(s: str) -> Optional[str]:
 # Carga JSON
 # ----------------------------
 def load_json(path: str) -> Any:
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, "r", encoding="utf-8-sig") as f:
         return json.load(f)
 
 def pick_id_field(row: Dict[str, Any], fallback_prefix: str) -> str:
@@ -360,6 +360,10 @@ def write_csv(path: str, rows: List[Dict[str, Any]], fieldnames: List[str]):
 # ----------------------------
 # Main
 # ----------------------------
+
+# ----------------------------
+# Main
+# ----------------------------
 def main() -> int:
     ensure_dirs()
 
@@ -379,140 +383,190 @@ def main() -> int:
     ambiguous_iniciativas: Dict[str, Dict[str, Any]] = {}
     parse_errors: List[Dict[str, Any]] = []
 
+    # New fields for votaciones: Added 'id'
     votaciones_fields = [
-        "votacion_uid", "zip_file", "xml_file",
+        "id", "votacion_uid", "zip_file", "xml_file",
         "sesion", "numero", "fecha",
         "titulo_punto", "texto_expediente",
         "asentimiento", "presentes", "a_favor", "en_contra", "abstenciones", "no_votan",
         "iniciativa_id", "iniciativa_match_status", "iniciativa_match_score", "iniciativa_second_best"
     ]
 
+    # Simplified fields for votos
+    # Removed: votacion_uid (replaced by votacion_id), iniciativa_*, asiento, diputado_match_status
     votos_fields = [
-        "votacion_uid",
-        "iniciativa_id", "iniciativa_match_status",
-        "asiento",
-        "diputado_xml", "diputado_id", "diputado_match_status",
+        "votacion_id",
+        "diputado_id", 
+        "diputado_xml", 
         "grupo", "voto"
     ]
 
     total_votaciones = 0
     total_votos = 0
 
-    with open(VOTACIONES_CSV, "w", newline="", encoding="utf-8") as fvot, \
-         open(VOTOS_CSV, "w", newline="", encoding="utf-8") as fvos:
+    # Prepare Votaciones File
+    fvot = open(VOTACIONES_CSV, "w", newline="", encoding="utf-8")
+    w_vot = csv.DictWriter(fvot, fieldnames=votaciones_fields)
+    w_vot.writeheader()
 
-        w_vot = csv.DictWriter(fvot, fieldnames=votaciones_fields)
-        w_vos = csv.DictWriter(fvos, fieldnames=votos_fields)
-        w_vot.writeheader()
-        w_vos.writeheader()
+    # Prepare Votos Chunks
+    CHUNK_SIZE = 50000
+    current_chunk_index = 0
+    current_chunk_rows = 0
+    generated_chunks = []
 
-        zip_files = [
-            os.path.join(ZIPS_DIR, f) for f in os.listdir(ZIPS_DIR)
-            if f.lower().endswith(".zip")
-        ]
-        zip_files.sort()
+    def open_new_chunk():
+        nonlocal current_chunk_index, current_chunk_rows
+        fname = f"votos_{current_chunk_index}.csv"
+        fpath = os.path.join(OUT_DIR, fname)
+        f = open(fpath, "w", newline="", encoding="utf-8")
+        w = csv.DictWriter(f, fieldnames=votos_fields)
+        w.writeheader()
+        generated_chunks.append(fname)
+        current_chunk_rows = 0
+        return f, w
 
-        for zip_path in zip_files:
-            zip_base = os.path.basename(zip_path)
+    fvos, w_vos = open_new_chunk()
 
-            for xml_name, xml_bytes in iter_xml_from_zip(zip_path):
-                try:
-                    root = ET.fromstring(xml_bytes)
-                except Exception as e:
-                    parse_errors.append({"zip": zip_base, "xml": xml_name, "error": f"XML parse error: {e}"})
-                    continue
+    zip_files = [
+        os.path.join(ZIPS_DIR, f) for f in os.listdir(ZIPS_DIR)
+        if f.lower().endswith(".zip")
+    ]
+    zip_files.sort()
 
-                info = root.find("Informacion")
-                totales = root.find("Totales")
-                votaciones = root.find("Votaciones")
+    # Votacion Integer ID Counter
+    votacion_int_id = 0
 
-                if info is None or votaciones is None:
-                    parse_errors.append({"zip": zip_base, "xml": xml_name, "error": "Estructura inesperada: falta <Informacion> o <Votaciones>"})
-                    continue
 
-                sesion = first_text(info, "Sesion")
-                numero = first_text(info, "NumeroVotacion")
-                fecha_raw = first_text(info, "Fecha")
-                fecha = parse_date_ddmmyyyy(fecha_raw) or fecha_raw
-                titulo_punto = first_text(info, "Titulo")
-                texto_expediente = first_text(info, "TextoExpediente")
+    # Stats accumulation
+    # deputy_id -> { si, no, abs, nv, name, party }
+    deputy_stats = {}
 
-                votacion_uid = f"{zip_base}__{xml_name}__S{sesion}_V{numero}_{fecha}".replace(os.sep, "_")
+    for zip_path in zip_files:
+        zip_base = os.path.basename(zip_path)
 
-                ini_id, ini_score, ini_status, ini_second = match_iniciativa(texto_expediente, ini_idx)
-                ini_second_s = "" if not ini_second else f"{ini_second[0]}:{ini_second[1]:.3f}"
+        for xml_name, xml_bytes in iter_xml_from_zip(zip_path):
+            try:
+                root = ET.fromstring(xml_bytes)
+            except Exception as e:
+                parse_errors.append({"zip": zip_base, "xml": xml_name, "error": f"XML parse error: {e}"})
+                continue
 
-                key = clean_expediente_text(texto_expediente)[:300]
-                if ini_status == "unmatched" and key not in unmatched_iniciativas:
-                    unmatched_iniciativas[key] = {
-                        "zip": zip_base, "xml": xml_name, "fecha": fecha, "sesion": sesion, "numero": numero,
-                        "titulo_punto": titulo_punto, "texto_expediente": texto_expediente,
-                        "best_score": f"{ini_score:.3f}", "second_best": ini_second_s
-                    }
-                if ini_status == "ambiguous" and key not in ambiguous_iniciativas:
-                    ambiguous_iniciativas[key] = {
-                        "zip": zip_base, "xml": xml_name, "fecha": fecha, "sesion": sesion, "numero": numero,
-                        "titulo_punto": titulo_punto, "texto_expediente": texto_expediente,
-                        "best_score": f"{ini_score:.3f}", "second_best": ini_second_s
-                    }
+            info = root.find("Informacion")
+            totales = root.find("Totales")
+            votaciones = root.find("Votaciones")
 
-                asentimiento = presentes = a_favor = en_contra = abstenciones = no_votan = ""
-                if totales is not None:
-                    asentimiento = first_text(totales, "Asentimiento")
-                    presentes = first_text(totales, "Presentes")
-                    a_favor = first_text(totales, "AFavor")
-                    en_contra = first_text(totales, "EnContra")
-                    abstenciones = first_text(totales, "Abstenciones")
-                    no_votan = first_text(totales, "NoVotan")
+            if info is None or votaciones is None:
+                parse_errors.append({"zip": zip_base, "xml": xml_name, "error": "Estructura inesperada: falta <Informacion> o <Votaciones>"})
+                continue
 
-                w_vot.writerow({
-                    "votacion_uid": votacion_uid,
-                    "zip_file": zip_base,
-                    "xml_file": xml_name,
-                    "sesion": sesion,
-                    "numero": numero,
-                    "fecha": fecha,
-                    "titulo_punto": titulo_punto,
-                    "texto_expediente": texto_expediente,
-                    "asentimiento": asentimiento,
-                    "presentes": presentes,
-                    "a_favor": a_favor,
-                    "en_contra": en_contra,
-                    "abstenciones": abstenciones,
-                    "no_votan": no_votan,
-                    "iniciativa_id": ini_id or "",
-                    "iniciativa_match_status": ini_status,
-                    "iniciativa_match_score": f"{ini_score:.3f}",
-                    "iniciativa_second_best": ini_second_s,
+            votacion_int_id += 1 # Increment ID
+
+            sesion = first_text(info, "Sesion")
+            numero = first_text(info, "NumeroVotacion")
+            fecha_raw = first_text(info, "Fecha")
+            fecha = parse_date_ddmmyyyy(fecha_raw) or fecha_raw
+            titulo_punto = first_text(info, "Titulo")
+            texto_expediente = first_text(info, "TextoExpediente")
+
+            votacion_uid = f"{zip_base}__{xml_name}__S{sesion}_V{numero}_{fecha}".replace(os.sep, "_")
+
+            ini_id, ini_score, ini_status, ini_second = match_iniciativa(texto_expediente, ini_idx)
+            ini_second_s = "" if not ini_second else f"{ini_second[0]}:{ini_second[1]:.3f}"
+
+            key = clean_expediente_text(texto_expediente)[:300]
+            if ini_status == "unmatched" and key not in unmatched_iniciativas:
+                unmatched_iniciativas[key] = {
+                    "zip": zip_base, "xml": xml_name, "fecha": fecha, "sesion": sesion, "numero": numero,
+                    "titulo_punto": titulo_punto, "texto_expediente": texto_expediente,
+                    "best_score": f"{ini_score:.3f}", "second_best": ini_second_s
+                }
+            if ini_status == "ambiguous" and key not in ambiguous_iniciativas:
+                ambiguous_iniciativas[key] = {
+                    "zip": zip_base, "xml": xml_name, "fecha": fecha, "sesion": sesion, "numero": numero,
+                    "titulo_punto": titulo_punto, "texto_expediente": texto_expediente,
+                    "best_score": f"{ini_score:.3f}", "second_best": ini_second_s
+                }
+
+            asentimiento = presentes = a_favor = en_contra = abstenciones = no_votan = ""
+            if totales is not None:
+                asentimiento = first_text(totales, "Asentimiento")
+                presentes = first_text(totales, "Presentes")
+                a_favor = first_text(totales, "AFavor")
+                en_contra = first_text(totales, "EnContra")
+                abstenciones = first_text(totales, "Abstenciones")
+                no_votan = first_text(totales, "NoVotan")
+
+            w_vot.writerow({
+                "id": votacion_int_id,
+                "votacion_uid": votacion_uid,
+                "zip_file": zip_base,
+                "xml_file": xml_name,
+                "sesion": sesion,
+                "numero": numero,
+                "fecha": fecha,
+                "titulo_punto": titulo_punto,
+                "texto_expediente": texto_expediente,
+                "asentimiento": asentimiento,
+                "presentes": presentes,
+                "a_favor": a_favor,
+                "en_contra": en_contra,
+                "abstenciones": abstenciones,
+                "no_votan": no_votan,
+                "iniciativa_id": ini_id or "",
+                "iniciativa_match_status": ini_status,
+                "iniciativa_match_score": f"{ini_score:.3f}",
+                "iniciativa_second_best": ini_second_s,
+            })
+            total_votaciones += 1
+
+            for v in votaciones.findall("Votacion"):
+                # Asiento no longer needed in output, but exists in XML
+                dip_xml = first_text(v, "Diputado")
+                grupo = first_text(v, "Grupo")
+                voto = first_text(v, "Voto")
+
+                dip_id, dip_status = match_diputado(dip_xml, dip_idx)
+                if dip_status == "unmatched":
+                    k = norm_name(dip_xml)
+                    unmatched_diputados[k] = unmatched_diputados.get(k, 0) + 1
+                elif dip_status == "ambiguous":
+                    k = norm_name(dip_xml)
+                    ambiguous_diputados[k] = ambiguous_diputados.get(k, 0) + 1
+
+                # Update Stats
+                if dip_id:
+                    if dip_id not in deputy_stats:
+                        deputy_stats[dip_id] = {"si": 0, "no": 0, "abs": 0, "nv": 0}
+                    
+                    v_lower = (voto or "").lower().strip()
+                    if v_lower in ('sí', 'si'): deputy_stats[dip_id]["si"] += 1
+                    elif v_lower == 'no': deputy_stats[dip_id]["no"] += 1
+                    elif v_lower in ('abstención', 'abstencion'): deputy_stats[dip_id]["abs"] += 1
+                    else: deputy_stats[dip_id]["nv"] += 1
+
+                w_vos.writerow({
+                    "votacion_id": votacion_int_id,
+                    "diputado_id": dip_id or "",
+                    "diputado_xml": dip_xml,
+                    "grupo": grupo,
+                    "voto": voto,
                 })
-                total_votaciones += 1
+                total_votos += 1
+                current_chunk_rows += 1
 
-                for v in votaciones.findall("Votacion"):
-                    asiento = first_text(v, "Asiento")
-                    dip_xml = first_text(v, "Diputado")
-                    grupo = first_text(v, "Grupo")
-                    voto = first_text(v, "Voto")
+                if current_chunk_rows >= CHUNK_SIZE:
+                    fvos.close()
+                    current_chunk_index += 1
+                    fvos, w_vos = open_new_chunk()
 
-                    dip_id, dip_status = match_diputado(dip_xml, dip_idx)
-                    if dip_status == "unmatched":
-                        k = norm_name(dip_xml)
-                        unmatched_diputados[k] = unmatched_diputados.get(k, 0) + 1
-                    elif dip_status == "ambiguous":
-                        k = norm_name(dip_xml)
-                        ambiguous_diputados[k] = ambiguous_diputados.get(k, 0) + 1
+    # Close handles
+    fvot.close()
+    fvos.close()
 
-                    w_vos.writerow({
-                        "votacion_uid": votacion_uid,
-                        "iniciativa_id": ini_id or "",
-                        "iniciativa_match_status": ini_status,
-                        "asiento": asiento,
-                        "diputado_xml": dip_xml,
-                        "diputado_id": dip_id or "",
-                        "diputado_match_status": dip_status,
-                        "grupo": grupo,
-                        "voto": voto,
-                    })
-                    total_votos += 1
+    # Write Stats
+    with open(os.path.join(OUT_DIR, "stats_diputados.json"), "w", encoding="utf-8") as f:
+        json.dump(deputy_stats, f, ensure_ascii=False, indent=2)
 
     unmatched_dip_rows = [{"diputado_xml_norm": k, "veces": v} for k, v in sorted(unmatched_diputados.items(), key=lambda x: -x[1])]
     ambiguous_dip_rows = [{"diputado_xml_norm": k, "veces": v} for k, v in sorted(ambiguous_diputados.items(), key=lambda x: -x[1])]
@@ -532,7 +586,7 @@ def main() -> int:
 
     summary = {
         "votaciones_csv": VOTACIONES_CSV,
-        "votos_csv": VOTOS_CSV,
+        "votos_chunks": generated_chunks,
         "reports_dir": REPORTS_DIR,
         "votaciones": total_votaciones,
         "votos": total_votos,
