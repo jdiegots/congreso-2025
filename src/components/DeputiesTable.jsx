@@ -32,6 +32,11 @@ const formatTimeDisplay = (totalMinutes) => {
 };
 
 export default function DeputiesTable({ onBack }) {
+    // Scroll to top on mount
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, []);
+
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');

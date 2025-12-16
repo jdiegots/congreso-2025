@@ -4,10 +4,15 @@ import diputadosData from '../../public/data/diputados.json';
 import partidosData from '../../public/data/partidos.json';
 
 export default function InitiativesTable({ onBack }) {
+    // Scroll to top on mount
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, []);
+
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const [sortConfig, setSortConfig] = useState({ key: 'fecha', direction: 'desc' });
+    const [sortConfig, setSortConfig] = useState({ key: 'fecha', direction: 'desc', isDefault: true });
     const [filterResult, setFilterResult] = useState('all'); // all, approved, rejected
 
     // Modal State
@@ -489,7 +494,7 @@ function VoteList({ title, votes, color }) {
 }
 
 function Th({ label, sortKey, activeSort, onClick, width }) {
-    const isActive = sortKey && activeSort && activeSort.key === sortKey;
+    const isActive = sortKey && activeSort && activeSort.key === sortKey && !activeSort.isDefault;
     const arrow = isActive ? (activeSort.direction === 'ascending' ? ' ↑' : ' ↓') : '';
 
     return (

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as d3 from "d3";
 import seatsData from "./data/seats_data.json";
 import diputadosData from "../public/data/diputados.json";
@@ -29,7 +29,7 @@ const isLegislative = (type) => {
   const t = (type || "").toLowerCase();
   if (t.includes("real decreto") || t.includes("reales decretos")) return "Reales decretos";
   if (t.includes("orgánica")) return "Leyes orgánicas";
-  if (t.includes("ley")) return "Leyes";
+  if (t.includes("ley")) return "Leyes ordinarias";
   return null;
 };
 
@@ -986,6 +986,22 @@ export default function App() {
   const [selectedDeputy, setSelectedDeputy] = useState(null);
   const [groupingCriteria, setGroupingCriteria] = useState('g_par');
 
+  // Save previous scroll position to restore it when returning from sub-pages
+  const prevScrollY = useRef(0);
+
+  const handleViewChange = (newView) => {
+    if (view === 'story' && newView !== 'story') {
+      prevScrollY.current = window.scrollY;
+    }
+    setView(newView);
+  };
+
+  useLayoutEffect(() => {
+    if (view === 'story' && prevScrollY.current > 0) {
+      window.scrollTo(0, prevScrollY.current);
+    }
+  }, [view]);
+
   // Stats state
   const [votesByDeputy, setVotesByDeputy] = useState({});
   const [interventionsMap, setInterventionsMap] = useState({}); // Map Name -> Total Minutes
@@ -1004,7 +1020,7 @@ export default function App() {
 
   // Story View Effect Logic 
   useEffect(() => {
-    const results = searchDeputies(searchTerm, diputadosData, interventionsMap, isMobile ? 2 : 3);
+    const results = searchDeputies(searchTerm, diputadosData, interventionsMap, isMobile ? 5 : 3);
     setSearchResults(results);
   }, [searchTerm, interventionsMap, isMobile]);
 
@@ -1261,11 +1277,13 @@ export default function App() {
 
     // SIMULATIONS
     const simulationCloud = d3.forceSimulation(processed)
-      .force("charge", d3.forceManyBody().strength(-2))
+      .force("charge", d3.forceManyBody().strength(isMobile ? -1 : -2))
       .force("center", d3.forceCenter(size.width / 2, size.height / 2))
-      .force("collide", d3.forceCollide(d => d.r + 1))
+      // Add radial force to constrain the cloud size, especially on mobile
+      .force("radial", d3.forceRadial(isMobile ? 60 : 150, size.width / 2, size.height / 2).strength(isMobile ? 0.4 : 0.1))
+      .force("collide", d3.forceCollide(d => d.r + (isMobile ? 0.5 : 1)))
       .stop();
-    for (let i = 0; i < 120; i++) simulationCloud.tick();
+    for (let i = 0; i < 150; i++) simulationCloud.tick();
     processed.forEach(n => { n.cloudX = n.x; n.cloudY = n.y; });
 
     const colWidth = size.width / catKeys.length;
@@ -1558,11 +1576,11 @@ export default function App() {
 
 
   if (view === 'database') {
-    return <InitiativesTable onBack={() => setView('story')} />;
+    return <InitiativesTable onBack={() => handleViewChange('story')} />;
   }
 
   if (view === 'deputies') {
-    return <DeputiesTable onBack={() => setView('story')} />;
+    return <DeputiesTable onBack={() => handleViewChange('story')} />;
   }
 
   return (
@@ -1583,43 +1601,45 @@ export default function App() {
         {/* FILTER CONTROLS */}
         <div style={{
           position: 'fixed',
-          top: '80px',
-          right: '24px',
+          top: isMobile ? '60px' : '80px',
+          right: isMobile ? '16px' : '24px',
           opacity: (scrollProgress > 0.98 ? 1 : 0) * uiOpacity,
           pointerEvents: (scrollProgress > 0.98 && uiOpacity > 0.1) ? 'auto' : 'none',
           transition: 'opacity 0.2s',
           zIndex: 40,
           backgroundColor: 'rgba(255,255,255,0.9)',
-          padding: '8px 16px',
+          padding: isMobile ? '4px 8px' : '8px 16px',
           borderRadius: '20px',
           boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
           display: 'flex',
-          gap: '8px',
-          alignItems: 'center'
+          gap: isMobile ? '4px' : '8px',
+          alignItems: 'center',
+          transform: isMobile ? 'scale(0.9)' : 'none',
+          transformOrigin: 'top right'
         }}>
 
 
-          <span style={{ fontSize: '12px', fontWeight: 600, color: '#666', marginRight: '4px' }}>AGRUPAR POR:</span>
+          <span style={{ fontSize: isMobile ? '9px' : '12px', fontWeight: 600, color: '#666', marginRight: isMobile ? '2px' : '4px' }}>AGRUPAR POR:</span>
           <button
             onClick={() => setGroupingCriteria('g_par')}
             style={{
               background: groupingCriteria === 'g_par' ? '#111' : '#eee',
               color: groupingCriteria === 'g_par' ? '#fff' : '#333',
-              border: 'none', padding: '6px 12px', borderRadius: '12px', cursor: 'pointer', fontSize: '12px', fontWeight: 500
-            }}>Grupo parlamentario</button>
+              border: 'none', padding: isMobile ? '4px 8px' : '6px 12px', borderRadius: '12px', cursor: 'pointer', fontSize: isMobile ? '10px' : '12px', fontWeight: 500
+            }}>Grupo</button>
           <button
             onClick={() => setGroupingCriteria('partido')}
             style={{
               background: groupingCriteria === 'partido' ? '#111' : '#eee',
               color: groupingCriteria === 'partido' ? '#fff' : '#333',
-              border: 'none', padding: '6px 12px', borderRadius: '12px', cursor: 'pointer', fontSize: '12px', fontWeight: 500
+              border: 'none', padding: isMobile ? '4px 8px' : '6px 12px', borderRadius: '12px', cursor: 'pointer', fontSize: isMobile ? '10px' : '12px', fontWeight: 500
             }}>Partido</button>
           <button
             onClick={() => setGroupingCriteria('circunscripcion')}
             style={{
               background: groupingCriteria === 'circunscripcion' ? '#111' : '#eee',
               color: groupingCriteria === 'circunscripcion' ? '#fff' : '#333',
-              border: 'none', padding: '6px 12px', borderRadius: '12px', cursor: 'pointer', fontSize: '12px', fontWeight: 500
+              border: 'none', padding: isMobile ? '4px 8px' : '6px 12px', borderRadius: '12px', cursor: 'pointer', fontSize: isMobile ? '10px' : '12px', fontWeight: 500
             }}>Circunscripción</button>
         </div>
 
@@ -1794,9 +1814,6 @@ export default function App() {
               <p className="hero-dek animate-enter delay-1">
                 Crónica visual de un año en el hemiciclo
               </p>
-              <p className="hero-credits animate-enter delay-2">
-                Votos, ausencias y equilibrios en el Congreso de los Diputados durante 2025.
-              </p>
 
               <p className="hero-credits animate-enter delay-3">
                 Por <strong>J. Diego Tejera Sosa</strong>
@@ -1812,6 +1829,117 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      <div
+        className={`search-section ${scrollY > 1600 && scrollY < 34000 && !selectedDeputy ? 'is-visible' : ''}`}
+        style={{
+          // Logic update: On mobile, if scroll is advanced (grouping), move search to top
+          // OR just apply the requested layout changes permanently for mobile when visible
+          opacity: (scrollY > 1600 && scrollY < 34000 && !selectedDeputy ? 1 : 0) * uiOpacity,
+          pointerEvents: 'none', // Container passes clicks through
+          zIndex: 99999, // Force highest priority
+          position: 'fixed',
+          transform: 'translate3d(0,0,0)', // Ensure hardware plane
+          ...(isMobile && scrollProgress > 0.5 ? {
+            top: '30px', // Above filters (which are at 60px)
+            bottom: 'auto',
+            transform: 'none',
+            width: 'auto',
+            right: '16px', // Align right like filters
+            left: 'auto', // Override centering
+            margin: 0
+          } : {})
+        }}
+      >
+        {!isMobile && (
+          <h2 className="search-header" style={{ pointerEvents: scrollY > 1600 && scrollY < 34000 && !selectedDeputy ? 'auto' : 'none' }}>
+            Conoce a los diputados
+          </h2>
+        )}
+
+        <div style={{
+          position: 'relative',
+          width: '100%',
+          maxWidth: isMobile ? '220px' : '400px', // Smaller on mobile
+          margin: isMobile && scrollProgress > 0.5 ? '0' : '0 auto',
+          transform: isMobile ? 'none' : undefined,
+          pointerEvents: scrollY > 1600 && scrollY < 34000 && !selectedDeputy ? 'auto' : 'none'
+        }}>
+          <input
+            type="text"
+            className="search-input"
+            placeholder={isMobile ? "Buscar..." : "Buscar diputado..."}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onFocus={() => setIsSearchFocused(true)}
+            onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
+            style={{
+              width: '100%',
+              fontSize: isMobile ? '10px' : undefined,
+              padding: isMobile ? '4px 12px' : undefined,
+              background: 'rgba(255,255,255,0.95)',
+              boxShadow: isMobile ? '0 2px 8px rgba(0,0,0,0.1)' : undefined,
+              borderRadius: isMobile ? '20px' : undefined, // Pill shape
+              height: isMobile ? '20px' : undefined, // Even more compact height
+              border: isMobile ? '1px solid #ddd' : undefined
+            }}
+          />
+          {isSearchFocused && searchResults.length > 0 && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              marginTop: '8px',
+              backgroundColor: 'white',
+              borderRadius: '12px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              padding: '8px 0',
+              display: 'flex',
+              flexDirection: 'column',
+              zIndex: 10000,
+              maxHeight: '400px',
+              overflowY: 'auto',
+              textAlign: 'left'
+            }}>
+              {searchResults.slice(0, isMobile ? 5 : 3).map(d => (
+                <div
+                  key={d.id}
+                  onClick={() => {
+                    const dep = getDeputyData(d.asiento ? parseInt(d.asiento) : getVirtualSeatId(d.id));
+                    setSelectedDeputy(dep);
+                    setSearchTerm("");
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    transition: 'background 0.2s',
+                  }}
+                  onMouseEnter={(e) => e.target.style.background = '#f3f4f6'}
+                  onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                >
+                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, background: '#eee' }}>
+                    <img
+                      src={`/images/diputados_img/${d.img || d.nombre.split(/[\s,]+/).join('_') + '.jpg'}`}
+                      alt=""
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '14px', fontWeight: 500, color: '#111' }}>{formatName(d.nombre)}</span>
+                    <span style={{ fontSize: '12px', color: '#666' }}>{d.partido} · {d.circunscripcion}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       <div style={{ height: "41500px" }} className="scroll-section">
         <div
           className="nyt-info-box"
@@ -1822,91 +1950,6 @@ export default function App() {
           }}
         >
           350 diputados y 18 ministros sin acta ocupan sus escaños
-        </div>
-
-        <div
-          className={`search-section ${scrollY > 1600 ? 'is-visible' : ''}`}
-          style={{
-            opacity: (scrollY > 1600 ? 1 : 0) * uiOpacity,
-            pointerEvents: scrollY > 1600 ? 'auto' : 'none'
-          }}
-        >
-          <h2 className="search-header" style={{
-            fontSize: isMobile ? '24px' : undefined,
-            transform: isMobile ? 'translateY(-30px)' : undefined,
-            marginBottom: isMobile ? '4px' : undefined
-          }}>
-            Conoce a los diputados
-          </h2>
-          <div style={{ position: 'relative', width: '100%', maxWidth: '400px', margin: '0 auto', transform: isMobile ? 'translateY(-30px)' : undefined }}>
-            <input
-              type="text"
-              className="search-input"
-              placeholder="Buscar diputado..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onFocus={() => setIsSearchFocused(true)}
-              onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
-              style={{
-                width: '100%',
-                fontSize: isMobile ? '14px' : undefined,
-                padding: isMobile ? '10px 16px' : undefined
-              }}
-            />
-            {isSearchFocused && searchResults.length > 0 && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                right: 0,
-                marginTop: '8px',
-                backgroundColor: 'white',
-                borderRadius: '12px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                padding: '8px 0',
-                display: 'flex',
-                flexDirection: 'column',
-                zIndex: 50,
-                maxHeight: '400px',
-                overflowY: 'auto',
-                textAlign: 'left'
-              }}>
-                {searchResults.slice(0, isMobile ? 2 : 3).map(d => (
-                  <div
-                    key={d.id}
-                    onClick={() => {
-                      const dep = getDeputyData(d.asiento ? parseInt(d.asiento) : getVirtualSeatId(d.id));
-                      setSelectedDeputy(dep);
-                      setSearchTerm("");
-                    }}
-                    style={{
-                      padding: '8px 16px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      transition: 'background 0.2s',
-                    }}
-                    onMouseEnter={(e) => e.target.style.background = '#f3f4f6'}
-                    onMouseLeave={(e) => e.target.style.background = 'transparent'}
-                  >
-                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, background: '#eee' }}>
-                      <img
-                        src={`/images/diputados_img/${d.img || d.nombre.split(/[\s,]+/).join('_') + '.jpg'}`}
-                        alt=""
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        onError={(e) => { e.target.style.display = 'none'; }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '14px', fontWeight: 500, color: '#111' }}>{formatName(d.nombre)}</span>
-                      <span style={{ fontSize: '12px', color: '#666' }}>{d.partido} · {d.circunscripcion}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Final Message */}
@@ -2389,26 +2432,27 @@ export default function App() {
             );
           })()}
 
-          {/* LEGISLATIVE SWARM (CIRCLES) */}
-          <LegislativeSwarm
-            scrollY={scrollY}
-            nodes={swarmData.nodes}
-            categories={swarmData.categories}
-            width={size.width}
-            height={size.height}
-            isMobile={isMobile}
-            onOpenDatabase={() => setView('database')}
-          />
-
-          {/* ABSTENTION SECTION */}
-          <AbstentionSection
-            scrollY={scrollY}
-            leaders={abstentionLeaders}
-            isMobile={isMobile}
-            onNavigate={(v) => setView(v)}
-          />
         </div>
       </div>
+
+      {/* LEGISLATIVE SWARM (CIRCLES) */}
+      <LegislativeSwarm
+        scrollY={scrollY}
+        nodes={swarmData.nodes}
+        categories={swarmData.categories}
+        width={size.width}
+        height={size.height}
+        isMobile={isMobile}
+        onOpenDatabase={() => handleViewChange('database')}
+      />
+
+      {/* ABSTENTION SECTION */}
+      <AbstentionSection
+        scrollY={scrollY}
+        leaders={abstentionLeaders}
+        isMobile={isMobile}
+        onNavigate={(v) => handleViewChange(v)}
+      />
     </div>
   );
 }
@@ -2428,7 +2472,7 @@ function LegislativeSwarm({ scrollY, nodes, categories, width, height, isMobile,
   const progress = Math.min(1, Math.max(0, rawP));
 
   // Only render if we are near the section
-  if (scrollY < SECTION_START - 2000) return null;
+  if (scrollY < SECTION_START - 2000 || scrollY > SECTION_END + 2000) return null;
 
 
 
@@ -2459,7 +2503,7 @@ function LegislativeSwarm({ scrollY, nodes, categories, width, height, isMobile,
       {/* 1. Cluster Labels */}
       <div style={{
         position: 'absolute',
-        top: '15%',
+        top: isMobile ? '25%' : '15%',
         width: '100%',
         display: 'flex',
         justifyContent: 'space-around',
@@ -2483,11 +2527,15 @@ function LegislativeSwarm({ scrollY, nodes, categories, width, height, isMobile,
           const x = node.cloudX + (node.clusterX - node.cloudX) * progress;
           const y = node.cloudY + (node.clusterY - node.cloudY) * progress;
           const isSelected = selectedNode && selectedNode.id === node.id;
+
+          // Reduce radius on mobile
+          const baseR = isMobile ? node.r * 0.6 : node.r;
+
           return (
             <circle
               key={node.id}
               cx={x} cy={y}
-              r={isSelected ? (node.r * 2.5) : node.r}
+              r={isSelected ? (baseR * 2.5) : baseR}
               fill={node.color}
               stroke="white"
               strokeWidth={isSelected ? 2 : 0.5}
@@ -2563,24 +2611,31 @@ function LegislativeSwarm({ scrollY, nodes, categories, width, height, isMobile,
       {/* Button Link */}
       <div style={{
         position: 'absolute', bottom: '100px', width: '100%', textAlign: 'center',
-        opacity: selectedNode ? 0 : Math.max(0, (progress - 0.8) * 5),
-        pointerEvents: (progress > 0.9 && !selectedNode) ? 'auto' : 'none',
+        opacity: selectedNode ? 0 : Math.max(0, Math.min((progress - 0.8) * 5, 1 - (scrollY - 35500) / 500)),
+        pointerEvents: (progress > 0.8 && !selectedNode && scrollY < 36000) ? 'auto' : 'none',
         zIndex: 200
       }}>
         <p style={{
           fontFamily: 'var(--font-sans)',
-          fontSize: isMobile ? '14px' : '16px',
+          fontSize: isMobile ? '12px' : '16px',
+          maxWidth: isMobile ? '70%' : '100%',
+          margin: '0 auto 16px',
+          lineHeight: '1.4',
           color: '#333',
-          marginBottom: '16px',
-          marginTop: 0,
           fontWeight: 500,
-          textShadow: '0 1px 2px rgba(255,255,255,0.8)'
+          textShadow: '0 1px 2px rgba(255,255,255,0.8)',
+          pointerEvents: 'none'
         }}>
           Esto es solo una parte del año legislativo. Si quieres ver el pleno completo:
         </p>
         <button
           onClick={onOpenDatabase}
-          style={{ background: '#111', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '30px', fontSize: '16px', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+          onTouchEnd={(e) => {
+            e.preventDefault(); // Prevent ghost clicks
+            onOpenDatabase();
+          }}
+          type="button"
+          style={{ background: '#111', color: '#fff', border: 'none', padding: isMobile ? '8px 16px' : '12px 24px', borderRadius: '30px', fontSize: isMobile ? '13px' : '16px', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
           Accede a todas las votaciones en el Pleno
         </button>
       </div>
@@ -2606,8 +2661,8 @@ function AbstentionSection({ scrollY, leaders, isMobile, onNavigate }) {
 
   // Trigger credits
   useEffect(() => {
-    if (finalOpacity > 0.9) {
-      const timer = setTimeout(() => setShowCredits(true), 1500);
+    if (finalOpacity > 0.5) {
+      const timer = setTimeout(() => setShowCredits(true), 500);
       return () => clearTimeout(timer);
     } else {
       setShowCredits(false);
@@ -2637,23 +2692,29 @@ function AbstentionSection({ scrollY, leaders, isMobile, onNavigate }) {
       position: 'fixed',
       top: 0, left: 0,
       width: '100%', height: '100%',
-      // We use flex to align generally, but children manage their own layout/visibility
+      // Use flex to center, but allow overflow for scrolling
       display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      pointerEvents: 'none',
+      alignItems: 'center', justifyContent: isMobile ? 'flex-start' : 'center', // Top aligned on mobile for scroll
+      pointerEvents: abstentionGlobalOpacity > 0.1 || finalOpacity > 0.1 || opSanchezTalks > 0.1 ? 'auto' : 'none', // Allow interaction when any content is visible
       zIndex: 55,
       // Background: White, masking underlying content
-      backgroundColor: `rgba(255,255,255,${0.95 * Math.max(abstentionGlobalOpacity, finalOpacity)})`
+      backgroundColor: `rgba(255,255,255,${0.95 * Math.max(abstentionGlobalOpacity, finalOpacity)})`,
+      overflowY: 'auto', // Enable scrolling
+      WebkitOverflowScrolling: 'touch'
     }}>
       {/* ABSTENTION CONTENT */}
       <div style={{
         display: abstentionGlobalOpacity > 0 ? 'flex' : 'none',
         opacity: abstentionGlobalOpacity,
-        justifyContent: 'center', gap: isMobile ? '16px' : '64px', maxWidth: '1200px', width: '100%', padding: isMobile ? '0 8px' : '0 40px', flexWrap: 'wrap', alignItems: 'flex-start'
+        justifyContent: 'center',
+        gap: isMobile ? '12px' : '64px', // Reduced gap
+        maxWidth: '1200px', width: '100%',
+        padding: isMobile ? '20px 16px 40px' : '0 40px', // Add padding for scroll spacing
+        flexWrap: 'wrap', alignItems: 'flex-start'
       }}>
         {/* Column 1: Junts */}
         <div style={{
-          flex: '1 1 400px',
+          flex: '1 1 300px', // Allow shrinking
           textAlign: 'center',
           display: 'flex',
           flexDirection: 'column',
@@ -2661,7 +2722,7 @@ function AbstentionSection({ scrollY, leaders, isMobile, onNavigate }) {
           opacity: opJunts,
           transition: 'opacity 0.3s ease-out'
         }}>
-          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: isMobile ? '24px' : '36px', fontWeight: 700, color: '#111', marginBottom: isMobile ? '8px' : '24px' }}>
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: isMobile ? '16px' : '36px', fontWeight: 700, color: '#111', marginBottom: isMobile ? '-24px' : '24px', position: 'relative', zIndex: 10 }}>
             Junts se abstiene
           </h2>
 
@@ -2669,59 +2730,63 @@ function AbstentionSection({ scrollY, leaders, isMobile, onNavigate }) {
             <img
               src="/images/abstencion.png"
               alt="Abstención"
-              style={{ maxWidth: '100%', maxHeight: isMobile ? '200px' : '550px', width: 'auto', height: 'auto' }}
+              style={{ maxWidth: '100%', maxHeight: isMobile ? '120px' : '550px', width: 'auto', height: 'auto' }}
             />
           </div>
 
-          <p style={{ fontFamily: 'var(--font-sans)', fontSize: isMobile ? '14px' : '18px', color: '#333', lineHeight: '1.4', marginTop: isMobile ? '-24px' : '-20px' }}>
+          <p style={{ fontFamily: 'var(--font-sans)', fontSize: isMobile ? '11px' : '18px', color: '#333', lineHeight: '1.4', marginTop: isMobile ? '-20px' : '-20px' }}>
             Con <strong>122 abstenciones</strong> cada uno, <strong>Josep Maria Cervera Pinart, Marta Marenas i Mir</strong> y <strong>Josep Pagès i Massó</strong> fueron los diputados que más veces se abstuvieron en 2025. <strong>Los tres pertenecen al Grupo Parlamentario Junts per Catalunya</strong>.
           </p>
         </div>
 
         {/* Column 2: Pedro Sánchez */}
         <div style={{
-          flex: '1 1 500px',
+          flex: '1 1 300px',
           opacity: opSanchezVotes,
           transition: 'opacity 0.3s ease-out'
         }}>
 
-          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '8px' : '32px', alignItems: 'center', textAlign: isMobile ? 'center' : 'left' }}>
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '4px' : '32px', alignItems: 'center', textAlign: isMobile ? 'center' : 'left', marginTop: isMobile ? '-24px' : '0' }}>
             {/* Image on the left */}
             <div style={{ flex: '0 0 auto' }}>
               <img
                 src="/images/pedro_sanchez.png"
                 alt="Pedro Sánchez"
-                style={{ maxWidth: isMobile ? '120px' : '250px', height: 'auto', display: 'block' }}
+                style={{ maxWidth: isMobile ? '80px' : '250px', height: 'auto', display: 'block' }}
               />
             </div>
 
             {/* Texts on the right */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: isMobile ? '16px' : '32px' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '32px', marginTop: isMobile ? '-5px' : '64px' }}>
 
               {/* Block 1: Votes */}
               <div>
-                <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: isMobile ? '22px' : '32px', fontWeight: 700, color: '#111', marginBottom: isMobile ? '4px' : '16px', marginTop: 0 }}>
+                <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: isMobile ? '16px' : '32px', fontWeight: 700, color: '#111', marginBottom: isMobile ? '2px' : '16px', marginTop: 0 }}>
                   El escaño más ocupado
                 </h2>
-                <p style={{ fontFamily: 'var(--font-sans)', fontSize: isMobile ? '14px' : '18px', color: '#333', lineHeight: '1.4', margin: 0 }}>
+                <p style={{ fontFamily: 'var(--font-sans)', fontSize: isMobile ? '11px' : '18px', color: '#333', lineHeight: '1.4', margin: 0 }}>
                   <strong>Pedro Sánchez Pérez-Castejón</strong>, presidente del Gobierno, <strong>no votó en 429</strong> de las <strong>más de 700 votaciones</strong> celebradas en 2025 en el Pleno del Congreso de los Diputados.
                 </p>
               </div>
 
               {/* Block 2: Interventions */}
               <div style={{ opacity: opSanchezTalks, transition: 'opacity 0.3s ease-out' }}>
-                <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: isMobile ? '22px' : '32px', fontWeight: 700, color: '#111', marginBottom: isMobile ? '4px' : '16px', marginTop: 0 }}>
+                <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: isMobile ? '16px' : '32px', fontWeight: 700, color: '#111', marginBottom: isMobile ? '2px' : '16px', marginTop: 0 }}>
                   Pero el que más habló
                 </h2>
-                <p style={{ fontFamily: 'var(--font-sans)', fontSize: isMobile ? '14px' : '18px', color: '#333', lineHeight: '1.4', margin: 0 }}>
+                <p style={{ fontFamily: 'var(--font-sans)', fontSize: isMobile ? '11px' : '18px', color: '#333', lineHeight: '1.4', margin: 0 }}>
                   Aún así, su presencia se dejó oír: <strong>intervino 123 veces</strong> en los plenos, con un total de <strong>40 horas y 49 minutos</strong> de palabra.
                 </p>
+                <div style={{ marginTop: '8px', fontSize: isMobile ? '10px' : '12px', color: '#999', fontStyle: 'italic' }}>
+                  Datos actualizados a 30 de noviembre de 2025.
+                </div>
               </div>
 
             </div>
           </div>
 
-          <div style={{ marginTop: isMobile ? '24px' : '80px', textAlign: 'center', opacity: opSanchezTalks, transition: 'opacity 0.3s ease-out' }}>
+          {/* Desktop Button - Inside Column */}
+          <div style={{ marginTop: '48px', textAlign: 'center', opacity: opSanchezTalks, transition: 'opacity 0.3s ease-out', display: isMobile ? 'none' : 'block' }}>
             <button onClick={() => {
               onNavigate('deputies');
             }} style={{
@@ -2741,17 +2806,38 @@ function AbstentionSection({ scrollY, leaders, isMobile, onNavigate }) {
           </div>
 
         </div>
+
+        {/* Mobile Button - Full Width Bottom */}
+        <div style={{ width: '100%', marginTop: '12px', textAlign: 'center', opacity: opSanchezTalks, transition: 'opacity 0.3s ease-out', display: isMobile ? 'block' : 'none' }}>
+          <button onClick={() => {
+            onNavigate('deputies');
+          }} style={{
+            background: '#111',
+            color: '#fff',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: '30px',
+            fontSize: '13px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+            pointerEvents: 'auto'
+          }}>
+            Accede a los datos de los diputados
+          </button>
+        </div>
+
       </div>
 
       {/* FINAL SECTION */}
       <div style={{
-        display: finalOpacity > 0 ? 'flex' : 'none',
+        display: finalOpacity > 0.01 ? 'flex' : 'none',
         opacity: finalOpacity,
         position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
         flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '48px',
         pointerEvents: finalOpacity > 0.5 ? 'auto' : 'none'
       }}>
-        <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '56px', fontWeight: 700, color: '#111', marginBottom: '16px', textAlign: 'center' }}>
+        <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: isMobile ? '36px' : '56px', fontWeight: 700, color: '#111', marginBottom: '16px', textAlign: 'center' }}>
           Dentro del Pleno
         </h1>
 
@@ -2766,9 +2852,9 @@ function AbstentionSection({ scrollY, leaders, isMobile, onNavigate }) {
               borderRadius: '30px',
               cursor: 'pointer',
               fontFamily: 'var(--font-sans)',
-              fontSize: isMobile ? '16px' : '18px',
+              fontSize: isMobile ? '12px' : '16px',
               color: '#333',
-              padding: '12px 24px',
+              padding: isMobile ? '6px 14px' : '10px 20px',
               fontWeight: 500,
               transition: 'all 0.2s',
               zIndex: 100
@@ -2787,9 +2873,9 @@ function AbstentionSection({ scrollY, leaders, isMobile, onNavigate }) {
               borderRadius: '30px',
               cursor: 'pointer',
               fontFamily: 'var(--font-sans)',
-              fontSize: isMobile ? '16px' : '18px',
+              fontSize: isMobile ? '12px' : '16px',
               color: '#fff',
-              padding: '12px 24px',
+              padding: isMobile ? '6px 14px' : '10px 20px',
               fontWeight: 600,
               boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
               transition: 'transform 0.2s',
@@ -2809,9 +2895,9 @@ function AbstentionSection({ scrollY, leaders, isMobile, onNavigate }) {
               borderRadius: '30px',
               cursor: 'pointer',
               fontFamily: 'var(--font-sans)',
-              fontSize: isMobile ? '16px' : '18px',
+              fontSize: isMobile ? '12px' : '16px',
               color: '#fff',
-              padding: '12px 24px',
+              padding: isMobile ? '6px 14px' : '10px 20px',
               fontWeight: 600,
               boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
               transition: 'transform 0.2s',
@@ -2820,7 +2906,7 @@ function AbstentionSection({ scrollY, leaders, isMobile, onNavigate }) {
             onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
             onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
           >
-            Votaciones de leyes e iniciativas
+            Votaciones
           </button>
         </div>
 
@@ -2854,6 +2940,15 @@ function AbstentionSection({ scrollY, leaders, isMobile, onNavigate }) {
                 <polyline points="22,6 12,13 2,6"></polyline>
               </svg>
             </a>
+            <a href="https://diegotejera.pages.dev" target="_blank" rel="noopener noreferrer"
+              className="shiny-icon"
+              style={{ color: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '48px', height: '48px' }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="2" y1="12" x2="22" y2="12"></line>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+              </svg>
+            </a>
           </div>
 
           <p style={{ fontFamily: 'var(--font-sans)', fontSize: '12px', color: '#999', margin: '24px 0 0', textAlign: 'center', maxWidth: '300px', lineHeight: 1.5 }}>
@@ -2861,7 +2956,6 @@ function AbstentionSection({ scrollY, leaders, isMobile, onNavigate }) {
           </p>
         </div>
       </div>
-
-    </div>
+    </div >
   );
 }
