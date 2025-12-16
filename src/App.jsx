@@ -29,7 +29,7 @@ const isLegislative = (type) => {
   const t = (type || "").toLowerCase();
   if (t.includes("real decreto") || t.includes("reales decretos")) return "Reales decretos";
   if (t.includes("orgánica")) return "Leyes orgánicas";
-  if (t.includes("ley")) return "Leyes ordinarias";
+  if (t.includes("ley")) return "Leyes";
   return null;
 };
 
@@ -1502,7 +1502,7 @@ export default function App() {
     ).length;
 
     return [
-      { label: "Leyes", count: leyesCount, color: "#111" },
+      { label: "Leyes ordinarias", count: leyesCount, color: "#111" },
       { label: "Reales decretos", count: realesCount, color: "#505050" },
       { label: "Leyes orgánicas", count: organicasCount, color: "#cccccc" }
     ];
@@ -2503,6 +2503,18 @@ function LegislativeSwarm({ scrollY, sectionStart, nodes, categories, width, hei
 
   const [selectedNode, setSelectedNode] = useState(null);
 
+  // Block scroll when a node is selected
+  useEffect(() => {
+    if (selectedNode) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [selectedNode]);
+
   const rawP = (scrollY - SECTION_START) / SECTION_TRANSITION;
   const progress = Math.min(1, Math.max(0, rawP));
 
@@ -2641,6 +2653,19 @@ function LegislativeSwarm({ scrollY, sectionStart, nodes, categories, width, hei
 
 
         </div>
+      )}
+
+      {/* Overlay to close */}
+      {selectedNode && (
+        <div
+          onClick={() => setSelectedNode(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.2)',
+            zIndex: 90
+          }}
+        />
       )}
 
       {/* Button Link */}
