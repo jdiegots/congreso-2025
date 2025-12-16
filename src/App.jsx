@@ -1356,6 +1356,9 @@ export default function App() {
   }, [selectedDeputy]);
 
   useEffect(() => {
+    // Only run scroll loop in story view
+    if (view !== 'story') return;
+
     let targetY = window.scrollY;
     let currentY = window.scrollY;
     let rafId = null;
@@ -1381,13 +1384,14 @@ export default function App() {
     };
 
     window.addEventListener("scroll", handleScroll);
+    // Initialize
     handleScroll();
 
     return () => {
       window.removeEventListener("scroll", handleScroll);
       if (rafId) cancelAnimationFrame(rafId);
     };
-  }, []);
+  }, [view]);
 
   const colorsVisible = scrollY > 200;
   const progress = Math.min(1, Math.max(0, scrollY / 300));
@@ -1557,6 +1561,12 @@ export default function App() {
   const swarmEnd = swarmStart + 6500;
 
   const abstentionStart = swarmEnd - 2000;
+
+  // Calculate final scroll height (dynamic)
+  // Logic from AbstentionSection: Final content starts fading in at abstentionStart + 4000
+  // It takes ~800px to fade in. We give it ~1500px buffer to settle.
+  const finalContentStart = abstentionStart + 4000;
+  const totalAppHeight = finalContentStart + 1500;
 
   // Phase 2: Approved bars transition (after user scrolls past phase 1)
   // When initProgress reaches a certain point (after bars are fully shown), swap to approved stats
@@ -1963,7 +1973,7 @@ export default function App() {
         </div>
       </div>
 
-      <div style={{ height: "41500px" }} className="scroll-section">
+      <div style={{ height: `${totalAppHeight}px` }} className="scroll-section">
         <div
           className="nyt-info-box"
           style={{
