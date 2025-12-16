@@ -988,10 +988,14 @@ export default function App() {
 
   // Save previous scroll position to restore it when returning from sub-pages
   const prevScrollY = useRef(0);
+  const [isRestoring, setIsRestoring] = useState(false);
 
   const handleViewChange = (newView) => {
     if (view === 'story' && newView !== 'story') {
       prevScrollY.current = window.scrollY;
+    }
+    if (newView === 'story') {
+      setIsRestoring(true);
     }
     setView(newView);
   };
@@ -999,6 +1003,12 @@ export default function App() {
   useLayoutEffect(() => {
     if (view === 'story' && prevScrollY.current > 0) {
       window.scrollTo({ top: prevScrollY.current, behavior: 'instant' });
+      // Small timeout to ensure paint happens after scroll
+      requestAnimationFrame(() => {
+        setIsRestoring(false);
+      });
+    } else {
+      setIsRestoring(false);
     }
   }, [view]);
 
@@ -1584,7 +1594,7 @@ export default function App() {
   }
 
   return (
-    <div className="app-container">
+    <div className="app-container" style={{ opacity: isRestoring ? 0 : 1, transition: 'opacity 0.1s' }}>
       <div className="hero-page">
         <HemicycleBackground
           colorsVisible={colorsVisible}
@@ -2612,7 +2622,7 @@ function LegislativeSwarm({ scrollY, nodes, categories, width, height, isMobile,
       <div style={{
         position: 'absolute', bottom: '100px', width: '100%', textAlign: 'center',
         opacity: selectedNode ? 0 : Math.max(0, Math.min((progress - 0.8) * 5, 1 - (scrollY - 35500) / 500)),
-        pointerEvents: (progress > 0.8 && !selectedNode && scrollY < 36000) ? 'auto' : 'none',
+        pointerEvents: (progress > 0.8 && !selectedNode && scrollY < 35500) ? 'auto' : 'none',
         zIndex: 200
       }}>
         <p style={{
@@ -2692,7 +2702,7 @@ function AbstentionSection({ scrollY, leaders, isMobile, onNavigate }) {
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: isMobile ? 'flex-start' : 'center', // Top aligned on mobile for scroll
       pointerEvents: abstentionGlobalOpacity > 0.1 || finalOpacity > 0.1 || opSanchezTalks > 0.1 ? 'auto' : 'none', // Allow interaction when any content is visible
-      zIndex: 55,
+      zIndex: 70,
       // Background: White, masking underlying content
       backgroundColor: `rgba(255,255,255,${0.95 * Math.max(abstentionGlobalOpacity, finalOpacity)})`,
       overflowY: 'auto', // Enable scrolling
