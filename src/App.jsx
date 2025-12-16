@@ -998,7 +998,7 @@ export default function App() {
 
   useLayoutEffect(() => {
     if (view === 'story' && prevScrollY.current > 0) {
-      window.scrollTo(0, prevScrollY.current);
+      window.scrollTo({ top: prevScrollY.current, behavior: 'instant' });
     }
   }, [view]);
 
@@ -2630,10 +2630,6 @@ function LegislativeSwarm({ scrollY, nodes, categories, width, height, isMobile,
         </p>
         <button
           onClick={onOpenDatabase}
-          onTouchEnd={(e) => {
-            e.preventDefault(); // Prevent ghost clicks
-            onOpenDatabase();
-          }}
           type="button"
           style={{ background: '#111', color: '#fff', border: 'none', padding: isMobile ? '8px 16px' : '12px 24px', borderRadius: '30px', fontSize: isMobile ? '13px' : '16px', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', pointerEvents: 'auto' }}>
           Accede a todas las votaciones en el Pleno
