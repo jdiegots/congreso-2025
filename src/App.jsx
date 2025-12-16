@@ -1418,7 +1418,8 @@ export default function App() {
   // Starts after Explosion finishes and "No todos" message has appeared.
   const departureStartY = 3500;
   // Much longer scroll to allow slow, delayed animations per item
-  const departureEndY = 28000;
+  // Reduced for mobile (12000 vs 24500 pixels duration)
+  const departureEndY = isMobile ? 15500 : 28000;
   const departureProgress = Math.min(1, Math.max(0, (scrollY - departureStartY) / (departureEndY - departureStartY)));
 
   const sortedDepartures = useMemo(() => {
@@ -1534,16 +1535,28 @@ export default function App() {
   // Vertical movement: bars move UP as scroll continues AFTER they appear
   // They should move from bottom to top smoothly
   // Start moving up when bars are fully visible (departureProgress >= 1.0, which means scrolling past departure section)
-  const barsVerticalStart = 27000; // Start moving when bars fully visible
+  // Vertical movement: bars move UP as scroll continues AFTER they appear
+  // They should move from bottom to top smoothly
+  // Start moving up when bars are fully visible (departureProgress >= 1.0, which means scrolling past departure section)
+  const barsVerticalStart = departureEndY - 1000; // Start moving when bars fully visible
   const barsVerticalRange = 5000; // Distance to move up over this scroll range
   const barsVerticalProgress = Math.max(0, (scrollY - barsVerticalStart) / barsVerticalRange);
   const barsVerticalOffset = barsVerticalProgress * 100; // Move from 0 to 100% up
 
   // Initiatives Section Progress (needed for phase 2 bars)
-  const initStartY = 28000; // Starts right where departures end
-  const initEndY = 34000;
+  const initStartY = departureEndY; // Starts right where departures end
+  const initDuration = 6000;
+  const initEndY = initStartY + initDuration;
   const initProgressRaw = Math.max(0, (scrollY - initStartY) / (initEndY - initStartY));
   const initProgress = Math.min(1, initProgressRaw);
+
+  const barsExitStart = initStartY + 2500;
+  const barsExitEnd = initStartY + 3300;
+
+  const swarmStart = initStartY + 3500;
+  const swarmEnd = swarmStart + 6500;
+
+  const abstentionStart = swarmEnd - 2000;
 
   // Phase 2: Approved bars transition (after user scrolls past phase 1)
   // When initProgress reaches a certain point (after bars are fully shown), swap to approved stats
@@ -2249,8 +2262,8 @@ export default function App() {
 
             // Fade out bars section before swarm appears
             // Swarm starts earlier now. Let's start fading bars out at 30500 to be gone by 31300
-            const barsExitStart = 30500;
-            const barsExitEnd = 31300;
+            // const barsExitStart = 30500; // Now defined in main scope
+            // const barsExitEnd = 31300;
             const barsExitProgress = Math.min(1, Math.max(0, (scrollY - barsExitStart) / (barsExitEnd - barsExitStart)));
             const barsExitOpacity = 1 - barsExitProgress;
 
@@ -2448,6 +2461,7 @@ export default function App() {
       {/* LEGISLATIVE SWARM (CIRCLES) */}
       <LegislativeSwarm
         scrollY={scrollY}
+        sectionStart={swarmStart}
         nodes={swarmData.nodes}
         categories={swarmData.categories}
         width={size.width}
@@ -2459,6 +2473,7 @@ export default function App() {
       {/* ABSTENTION SECTION */}
       <AbstentionSection
         scrollY={scrollY}
+        sectionStart={abstentionStart}
         leaders={abstentionLeaders}
         isMobile={isMobile}
         onNavigate={(v) => handleViewChange(v)}
@@ -2470,11 +2485,11 @@ export default function App() {
 // ==========================================
 // SUB-COMPONENT: LegislativeSwarm
 // ==========================================
-function LegislativeSwarm({ scrollY, nodes, categories, width, height, isMobile, onOpenDatabase }) {
+function LegislativeSwarm({ scrollY, sectionStart, nodes, categories, width, height, isMobile, onOpenDatabase }) {
   // 1. CONFIGURATION
-  const SECTION_START = 31500;
+  const SECTION_START = sectionStart || 31500;
   const SECTION_TRANSITION = 4000;
-  const SECTION_END = 38000; // REDUCED from 45000 to shorten scroll
+  const SECTION_END = SECTION_START + 6500; // REDUCED from 45000 to shorten scroll
 
   const [selectedNode, setSelectedNode] = useState(null);
 
@@ -2654,10 +2669,10 @@ function LegislativeSwarm({ scrollY, nodes, categories, width, height, isMobile,
 // SUB-COMPONENT: AbstentionSection
 // ==========================================
 
-function AbstentionSection({ scrollY, leaders, isMobile, onNavigate }) {
-  const START = 36000; // Reduced from 40000
-  const FADE_OUT_START = 39000; // Reduced from 43000
-  const FINAL_START = 40000; // Reduced from 44000
+function AbstentionSection({ scrollY, sectionStart, leaders, isMobile, onNavigate }) {
+  const START = sectionStart || 36000; // Reduced from 40000
+  const FADE_OUT_START = START + 3000; // Reduced from 43000
+  const FINAL_START = START + 4000; // Reduced from 44000
   const STAGGER_STEP = 600;
 
   const [showCredits, setShowCredits] = useState(false);
