@@ -2818,7 +2818,7 @@ function AbstentionSection({ scrollY, sectionStart, leaders, isMobile, onNavigat
               {/* Block 1: Votes */}
               <div>
                 <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: isMobile ? '16px' : '32px', fontWeight: 700, color: '#111', marginBottom: isMobile ? '2px' : '16px', marginTop: 0 }}>
-                  El escaño más ocupado
+                  El escaño más vacío
                 </h2>
                 <p style={{ fontFamily: 'var(--font-sans)', fontSize: isMobile ? '11px' : '18px', color: '#333', lineHeight: '1.4', margin: 0 }}>
                   <strong>Pedro Sánchez Pérez-Castejón</strong>, presidente del Gobierno, <strong>no votó en 429</strong> de las <strong>más de 700 votaciones</strong> celebradas en 2025 en el Pleno del Congreso de los Diputados.
